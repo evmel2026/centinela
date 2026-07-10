@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.4.0">
+<meta name="app-version" content="4.8.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,6 +22,8 @@
     --line:rgba(122,164,224,.14);
     --line-2:rgba(122,164,224,.26);
     --neon:#2de2ea;
+    --lime:#c8f135;
+    --lime-soft:#a8d92a;
     --violet:#8a63ff;
     --magenta:#e05cff;
     --gold:#d8a94a;
@@ -86,6 +88,7 @@
   .btn.ghost{background:transparent}
   .btn.sm{padding:6px 10px;font-size:12px}
   .btn.bell.on{border-color:var(--neon);color:var(--neon)}
+  #musicBtn.on{border-color:var(--lime);color:var(--lime)}
 
   /* ===== Hero con radar ===== */
   .hero{display:grid;grid-template-columns:auto 1fr;gap:30px;align-items:center;
@@ -98,6 +101,13 @@
     background:linear-gradient(180deg,transparent,rgba(45,226,234,.10),transparent)}
   .scanning .hero::after{opacity:1;animation:scanpass 1.6s linear infinite}
   @keyframes scanpass{from{transform:translateY(0)}to{transform:translateY(420%)}}
+
+  /* ===== Grafo neuronal de fondo (estilo Agentic OS) ===== */
+  .neuralfx{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.9;
+    -webkit-mask-image:radial-gradient(circle at 50% 45%,#000 0%,#000 45%,transparent 78%);
+            mask-image:radial-gradient(circle at 50% 45%,#000 0%,#000 45%,transparent 78%)}
+  .neuralfx canvas{width:100%;height:100%;display:block}
+  .hero > .radar,.hero > .hero-info{position:relative;z-index:1}
 
   .radar{position:relative;width:158px;height:158px}
   .radar .rings{position:absolute;inset:14px;border-radius:50%;border:1px solid rgba(122,164,224,.18)}
@@ -228,6 +238,77 @@
   .tag.w{background:rgba(240,181,46,.16);color:var(--warn)}
   .empty-ok{font-size:11px;color:var(--ok);font-family:var(--mono);padding:3px 0}
 
+  /* ===== Widget del tiempo ===== */
+  .weather{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:linear-gradient(140deg,rgba(14,26,48,.6),rgba(6,12,24,.6));
+    border:1px solid var(--line);border-radius:14px;padding:10px 16px;margin-bottom:14px;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rise .6s both}
+  .wx-city{display:flex;align-items:center;gap:10px}
+  .wx-city + .wx-city{padding-left:14px;border-left:1px solid var(--line)}
+  .wx-ico{font-size:26px;line-height:1;filter:drop-shadow(0 0 8px rgba(45,226,234,.25))}
+  .wx-body{line-height:1.25}
+  .wx-name{font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.08em;text-transform:uppercase}
+  .wx-temp{font-family:var(--disp);font-size:20px;font-weight:700}
+  .wx-desc{font-size:10.5px;color:var(--ink-dim)}
+  .wx-meta{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-faint);text-align:right;line-height:1.5}
+  @media(max-width:620px){ .weather{gap:10px}.wx-meta{width:100%;text-align:left;margin-left:0;margin-top:4px} }
+
+  /* ===== Panel SUEP: usuarios y accesos ===== */
+  .suep-hero{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .suep-kpi{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;animation:rise .6s both}
+  .suep-kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--lime),var(--neon));opacity:.8}
+  .suep-kpi .k{font-size:9px;color:var(--ink-faint);letter-spacing:.14em;text-transform:uppercase;font-family:var(--mono)}
+  .suep-kpi .v{font-family:var(--disp);font-size:26px;font-weight:700;margin-top:4px;line-height:1;text-shadow:0 0 16px rgba(200,241,53,.22)}
+  .suep-kpi .v.lime{color:var(--lime)}
+  .suep-kpi .h{font-size:10px;color:var(--ink-faint);margin-top:4px}
+
+  .suep-panel{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:16px 18px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rise .55s both}
+  .suep-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .suep-col h4{margin:0 0 12px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-family:var(--disp);color:var(--gold);display:flex;align-items:center;gap:8px}
+  .suep-col h4 .cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:normal;text-transform:none}
+  .suep-tabs{display:flex;gap:6px;margin-bottom:14px}
+  .suep-tab{font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--ink-dim);cursor:pointer;transition:.18s}
+  .suep-tab:hover{border-color:var(--line-2);color:var(--ink)}
+  .suep-tab.on{border-color:var(--lime);color:var(--lime);background:rgba(200,241,53,.08)}
+
+  .u-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);animation:fadein .35s both}
+  .u-row:last-child{border-bottom:none}
+  .u-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:grid;place-content:center;font-family:var(--disp);font-weight:700;font-size:13px;color:#04070f;background:linear-gradient(140deg,var(--neon),var(--violet))}
+  .u-av.on{background:linear-gradient(140deg,var(--lime),var(--ok));box-shadow:0 0 12px rgba(200,241,53,.4)}
+  .u-av.adm{background:linear-gradient(140deg,var(--gold),var(--magenta))}
+  .u-main{flex:1;min-width:0}
+  .u-name{font-size:13.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .u-sub{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .u-right{text-align:right;flex-shrink:0}
+  .u-count{font-family:var(--disp);font-size:17px;font-weight:700;color:var(--lime);line-height:1}
+  .u-count .lbl{font-family:var(--mono);font-size:9px;color:var(--ink-faint);display:block;margin-top:2px;letter-spacing:.06em}
+  .u-live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--ok);letter-spacing:.05em}
+  .u-live .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);animation:pulse 1.4s infinite}
+  .u-bar{height:4px;border-radius:3px;background:rgba(255,255,255,.05);margin-top:5px;overflow:hidden}
+  .u-bar > i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--neon),var(--lime));animation:draw2 .8s ease-out}
+  @keyframes draw2{from{width:0}}
+  .u-empty{padding:20px 0;text-align:center;color:var(--ink-faint);font-size:12.5px;font-family:var(--mono)}
+  .rol-breakdown{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+  .rol-pill{font-family:var(--mono);font-size:10.5px;color:var(--ink-dim);letter-spacing:.03em;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(200,241,53,.05)}
+  .rol-pill b{color:var(--lime);font-weight:700}
+  .rol-group{margin-bottom:6px}
+  .rol-head{font-family:var(--disp);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);padding:8px 0 4px;display:flex;align-items:center;gap:7px}
+  .rol-head span{margin-left:auto;font-family:var(--mono);color:var(--lime);font-size:11px}
+  .live-row .u-timer{font-family:var(--disp);font-size:15px;font-weight:700;color:var(--lime);line-height:1;margin-top:3px;font-variant-numeric:tabular-nums;text-shadow:0 0 10px rgba(200,241,53,.25)}
+  .suep-activity{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+  .suep-activity h4{margin:0 0 12px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-family:var(--disp);color:var(--gold);display:flex;align-items:center;gap:8px}
+  .suep-activity h4 .cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:normal;text-transform:none}
+  .suep-activity .u-list{max-height:360px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  .u-ago{font-family:var(--disp);font-size:13px;font-weight:700;color:var(--ink-dim);line-height:1}
+  @media(max-width:760px){ .suep-activity .u-list{grid-template-columns:1fr} }
+  .u-stale-sep{display:none}
+  .u-list{max-height:420px;overflow:auto}
+  .suep-off{padding:22px 0;text-align:center;color:var(--warn);font-size:13px;font-family:var(--mono)}
+  @media(max-width:760px){
+    .suep-hero{grid-template-columns:repeat(2,1fr)}
+    .suep-cols{grid-template-columns:1fr;gap:26px}
+  }
+
   /* ===== Incidentes y bitácora ===== */
   .inc,.log{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:6px 16px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
   .inc-row{display:grid;grid-template-columns:138px 92px auto 1fr;gap:12px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px;animation:fadein .4s both}
@@ -337,13 +418,21 @@
     <div class="net" id="netBadge"><span class="dot" style="background:var(--ink-faint)"></span><span id="netText">Sin escanear</span></div>
     <button class="btn primary sm" id="installBtn" style="display:none">⬇ Instalar</button>
     <button class="btn sm" id="userBtn" title="Cambiar de usuaria">👤</button>
+    <button class="btn sm" id="musicBtn" title="Música ambiente">🎵 Música</button>
     <button class="btn bell sm" id="bellBtn" title="Activar notificaciones del navegador">🔔 Avisos</button>
     <button class="btn sm" id="cfgBtn">Configurar</button>
     <button class="btn sm" id="deepBtn" title="Descarga y valida todos los datos (usa más egress)">Escaneo profundo</button>
     <button class="btn primary sm" id="scanBtn">Escanear ahora</button>
   </header>
 
+  <div class="weather" id="weather" style="display:none">
+    <div class="wx-city"><span class="wx-ico" id="wx1ico">…</span><div class="wx-body"><div class="wx-name">Cutral-Có</div><div class="wx-temp" id="wx1temp">—</div><div class="wx-desc" id="wx1desc">cargando…</div></div></div>
+    <div class="wx-city"><span class="wx-ico" id="wx2ico">…</span><div class="wx-body"><div class="wx-name">Plaza Huincul</div><div class="wx-temp" id="wx2temp">—</div><div class="wx-desc" id="wx2desc">cargando…</div></div></div>
+    <div class="wx-meta" id="wxMeta"></div>
+  </div>
+
   <section class="hero" id="hero">
+    <div class="neuralfx"><canvas id="neuralCanvas"></canvas></div>
     <div class="radar" id="radar">
       <div class="rings"></div>
       <div class="cross"></div>
@@ -369,6 +458,35 @@
     <div class="stat"><div class="k">Latencia prom.</div><div class="v" id="stLat">—</div><div class="h">último escaneo</div></div>
     <div class="stat"><div class="k">Egress del escaneo</div><div class="v" id="stEgress">—</div><div class="h">descargado recién</div></div>
     <div class="stat"><div class="k">Egress hoy</div><div class="v" id="stEgressDay">—</div><div class="h">acumulado desde este equipo</div></div>
+  </div>
+
+  <div class="seclabel">Control SUEP · Escuela de Policía <span id="suepClock" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:normal;text-transform:none"></span></div>
+  <div class="suep-hero" id="suepHero">
+    <div class="suep-kpi"><div class="k">Conectados ahora</div><div class="v lime" id="skConnected">—</div><div class="h">sesiones activas</div></div>
+    <div class="suep-kpi"><div class="k">Ingresos hoy</div><div class="v" id="skToday">—</div><div class="h">accesos del día</div></div>
+    <div class="suep-kpi"><div class="k">Usuarios (7 días)</div><div class="v" id="skWeekUsers">—</div><div class="h">personas distintas</div></div>
+    <div class="suep-kpi"><div class="k">Ingresos (7 días)</div><div class="v" id="skWeek">—</div><div class="h">accesos de la semana</div></div>
+  </div>
+  <div class="suep-panel" id="suepPanel">
+    <div class="suep-cols">
+      <div class="suep-col">
+        <h4>🟢 Conectados ahora <span class="cnt" id="suepNowCnt"></span></h4>
+        <div class="u-list" id="suepNow"><div class="u-empty">Escaneá para ver quién está en línea.</div></div>
+      </div>
+      <div class="suep-col">
+        <h4>📊 Ranking de ingresos <span class="cnt" id="suepRankCnt"></span></h4>
+        <div class="suep-tabs" id="suepTabs">
+          <button class="suep-tab on" data-range="today">Hoy</button>
+          <button class="suep-tab" data-range="week">7 días</button>
+          <button class="suep-tab" data-range="all">Histórico</button>
+        </div>
+        <div class="u-list" id="suepRank"><div class="u-empty">Escaneá para ver el ranking.</div></div>
+      </div>
+    </div>
+    <div class="suep-activity">
+      <h4>🕘 Última actividad <span class="cnt" id="suepActCnt"></span></h4>
+      <div class="u-list" id="suepActivity"><div class="u-empty">Escaneá para ver la última conexión de cada usuario.</div></div>
+    </div>
   </div>
 
   <div class="seclabel">Aplicaciones</div>
@@ -628,7 +746,21 @@ var PH_DIA=[
   "La Secretaría funciona porque ustedes dos no aflojan.",
   "Respirá hondo: el radar ya está girando por vos.",
   "Que la única alerta de hoy sea la del recreo.",
-  "Todo gran sistema empezó con alguien que se animó. Como vos."
+  "Todo gran sistema empezó con alguien que se animó. Como vos.",
+  "Otro día para demostrar por qué esto funciona tan bien.",
+  "El orden de hoy es la tranquilidad de mañana. A darle.",
+  "Ningún dato se pierde bajo tu guardia. Empecemos.",
+  "Vos ponés el criterio, yo pongo el radar. Buen equipo.",
+  "Lo invisible también cuenta: gracias por sostenerlo cada día.",
+  "Que la rutina de hoy sea aburridamente perfecta. 😌",
+  "Pequeños chequeos, gran diferencia. Arranquemos.",
+  "El sistema respira tranquilo porque vos estás al mando.",
+  "Hoy es un buen día para que todo siga funcionando bien.",
+  "Constancia silenciosa: así se construye lo que dura.",
+  "Un tablero verde no se hace solo. Se hace con vos.",
+  "Cada acceso, cada dato, cada revisión: todo suma. Vamos.",
+  "La calma del sistema empieza con tu primer café del día.",
+  "Sos la diferencia entre el caos y el orden. Buen día."
 ];
 var PH_LUNES=[
   "Arranca la semana: el radar ya calentó motores. ¡Vamos!",
@@ -642,10 +774,37 @@ var PH_VIERNES=[
 ];
 function getUser(){ var u=safeGet(USER_KEY); return USERS[u]?u:null; }
 function greetPrefix(){ var h=new Date().getHours(); if(h<12)return "☀ Buen día"; if(h<20)return "🌤 Buenas tardes"; return "🌙 Buenas noches"; }
+
+/* PRNG con semilla (mulberry32) → permutación reproducible del pool */
+function seededRand(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0;
+  var t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296; }; }
+function shuffledPool(pool, seed){
+  var arr=pool.slice(), rnd=seededRand(seed);
+  for(var i=arr.length-1;i>0;i--){ var j=Math.floor(rnd()*(i+1)); var t=arr[i]; arr[i]=arr[j]; arr[j]=t; }
+  return arr;
+}
+/* Índice global continuo sobre PH_DIA: cada vuelta (ciclo) se baraja distinto y
+   se recorren las 39 frases sin repetir ninguna antes de agotarlas. El día de
+   la semana especial (lunes/viernes) sólo SUSTITUYE la frase mostrada por una de
+   su lista corta, pero NO altera el contador base, así el recorrido de PH_DIA
+   sigue intacto y sin repeticiones. */
 function dailyPhrase(u){
   var day=Math.floor(Date.now()/86400000), dow=new Date().getDay();
-  var pool = dow===1 ? PH_LUNES.concat(PH_DIA) : dow===5 ? PH_VIERNES.concat(PH_DIA) : PH_DIA;
-  return pool[(day*3+USERS[u].seed)%pool.length];
+  var seedBase=USERS[u].seed*10007;
+  /* frase base garantizada sin repetición dentro del ciclo */
+  var cycle=Math.floor(day/PH_DIA.length);
+  var idx=day - cycle*PH_DIA.length;
+  var base=shuffledPool(PH_DIA, seedBase + cycle*7919)[idx];
+  /* lunes/viernes: sustituye por su lista especial, rotando sin repetir */
+  var special = dow===1 ? PH_LUNES : dow===5 ? PH_VIERNES : null;
+  if(special){
+    /* desfase por usuario para que Mely y Eliana no coincidan el mismo día */
+    var off = USERS[u].seed % special.length;
+    var sCycle=Math.floor((day+off)/special.length), sIdx=(day+off) - sCycle*special.length;
+    return shuffledPool(special, seedBase+90001+sCycle*7919)[sIdx];
+  }
+  return base;
 }
 var greetTimer=null;
 function typeGreet(text){
@@ -911,6 +1070,7 @@ function scanAll(deep){
     typeLine(states.err>0 ? pick(PH_ERR) : states.warn>0 ? pick(PH_WARN) : pick(PH_OK));
     if(alerts.length){ notify(alerts); if(cfg.sound) beep(); }
     if(recoveries.length) notify(recoveries);
+    refreshSuep();
   }).catch(function(e){ toast("Error en el escaneo: "+(e.message||e)); typeLine("No pude completar el barrido. Reintento en el próximo ciclo."); })
   .finally(function(){ scanning=false; document.body.classList.remove("scanning"); $("scanBtn").textContent="Escanear ahora"; });
 }
@@ -1109,6 +1269,432 @@ function exportReport(){
   toast("Informe exportado");
 }
 
+/* ===== Panel SUEP: usuarios y accesos ===== */
+var SUEP_KEY="suep";
+var suepAccesos=null;        /* array de accesos crudos */
+var suepRange="today";       /* rango activo del ranking */
+
+function getSuepApp(){
+  for(var i=0;i<cfg.apps.length;i++){ if(cfg.apps[i].key===SUEP_KEY) return cfg.apps[i]; }
+  return null;
+}
+/* Trae la fila app_data key='suep_accesos' y parsea el JSON anidado */
+function fetchSuepAccesos(){
+  var app=getSuepApp(); if(!app) return Promise.resolve(null);
+  var base=app.url.replace(/\/+$/,"");
+  var q="app_data?key=eq.suep_accesos&select=value&limit=1";
+  return fetch(base+"/rest/v1/"+q, { headers:hdrs(app) }).then(function(res){
+    return res.text().then(function(txt){
+      if(!res.ok) throw httpError(res, txt);
+      var rows=JSON.parse(txt);
+      if(!rows.length) return [];
+      var val=rows[0].value;
+      if(typeof val==="string"){ try{ val=JSON.parse(val); }catch(e){ return []; } }
+      return Array.isArray(val)?val:[];
+    });
+  }).catch(function(){ return null; });
+}
+function suepInitials(nombre){
+  var p=String(nombre||"?").trim().split(/\s+/);
+  if(p.length===1) return (p[0][0]||"?").toUpperCase();
+  return ((p[0][0]||"")+(p[p.length-1][0]||"")).toUpperCase();
+}
+function isAdminRol(rol){ return /admin/i.test(rol||""); }
+function suepDayStart(){ var d=new Date(); d.setHours(0,0,0,0); return d.getTime(); }
+/* Cuenta ingresos por usuario en una ventana temporal (0 = histórico) */
+function suepRankData(sinceMs){
+  if(!suepAccesos) return [];
+  var map={};
+  suepAccesos.forEach(function(a){
+    var ts=a.entradaTs||0;
+    if(sinceMs && ts<sinceMs) return;
+    var key=a.usuario||a.nombre;
+    if(!map[key]) map[key]={nombre:a.nombre,usuario:a.usuario,rol:a.rol,count:0,last:0};
+    map[key].count++;
+    if(ts>map[key].last) map[key].last=ts;
+  });
+  var arr=Object.keys(map).map(function(k){ return map[k]; });
+  arr.sort(function(x,y){ return y.count-x.count || y.last-x.last; });
+  return arr;
+}
+var SUEP_STALE_MS=4*3600000;   /* red de seguridad: sesión activa >4h se marca sin cerrar */
+/* orden de prioridad de roles para agrupar */
+var ROL_ORDER=["Administradora","Administrativa","Jefe de Guardia","Instructor","Logístico"];
+function rolRank(rol){ var i=ROL_ORDER.indexOf(rol); return i<0?99:i; }
+function rolIcon(rol){
+  if(/admin/i.test(rol)) return "👑";
+  if(/jefe/i.test(rol)) return "🛡️";
+  if(/instructor/i.test(rol)) return "🎓";
+  if(/log/i.test(rol)) return "📦";
+  return "👤";
+}
+/* formatea una duración en vivo hh:mm:ss (o mm:ss) */
+function fmtDur(ms){
+  if(ms<0) ms=0; var s=Math.floor(ms/1000);
+  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  return (h>0?(h+"h "):"")+pad(m)+"m "+pad(ss)+"s";
+}
+function renderSuepNow(){
+  var box=$("suepNow"); if(!box) return;
+  if(!suepAccesos){ box.innerHTML='<div class="suep-off">SUEP no respondió. Reintento en el próximo escaneo.</div>'; $("suepNowCnt").textContent=""; return; }
+  var now=Date.now();
+  /* conectados reales: activos y con sesión reciente (la red de 4h descarta
+     cualquier sesión vieja que hubiera quedado colgada de antes) */
+  var vivos=suepAccesos.filter(function(a){
+    return a.activo===true && (now-(a.entradaTs||0))<=SUEP_STALE_MS && (a.entradaTs||0)>=suepDayStart();
+  });
+  $("suepNowCnt").textContent=vivos.length+" en línea";
+
+  var html="";
+  if(!vivos.length){ html+='<div class="u-empty">Nadie conectado en este momento.</div>'; }
+  else {
+    /* desglose por rol arriba */
+    var byRol={};
+    vivos.forEach(function(a){ var r=a.rol||"Sin rol"; (byRol[r]=byRol[r]||[]).push(a); });
+    var roles=Object.keys(byRol).sort(function(x,y){ return rolRank(x)-rolRank(y); });
+    html+='<div class="rol-breakdown">'+roles.map(function(r){
+      return '<span class="rol-pill">'+rolIcon(r)+' '+esc(r)+' <b>'+byRol[r].length+'</b></span>';
+    }).join("")+'</div>';
+    /* grupos por rol */
+    roles.forEach(function(r){
+      var grupo=byRol[r].slice().sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });
+      html+='<div class="rol-group"><div class="rol-head">'+rolIcon(r)+' '+esc(r)+' <span>'+grupo.length+'</span></div>';
+      html+=grupo.map(function(a){
+        var avc=isAdminRol(a.rol)?"adm":"on";
+        var hora=(a.entrada||"").split(", ")[1]||a.entrada||"";
+        return '<div class="u-row live-row">'+
+          '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+          '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+            '<div class="u-sub">📍 '+esc(a.sector||"—")+'</div>'+
+            '<div class="u-sub">🕐 entró '+esc(hora)+'</div></div>'+
+          '<div class="u-right"><span class="u-live"><span class="dot"></span>en línea</span>'+
+            '<div class="u-timer" data-ts="'+(a.entradaTs||0)+'">'+fmtDur(now-(a.entradaTs||0))+'</div></div>'+
+          '</div>';
+      }).join("");
+      html+='</div>';
+    });
+  }
+  box.innerHTML=html;
+}
+/* Cronómetro en vivo: actualiza los tiempos de conexión cada segundo */
+var suepTimerInt=null;
+function startSuepTimers(){
+  if(suepTimerInt) clearInterval(suepTimerInt);
+  suepTimerInt=setInterval(function(){
+    if(document.hidden) return;
+    var now=Date.now();
+    var els=document.querySelectorAll("#suepNow .u-timer");
+    els.forEach(function(el){
+      var ts=parseInt(el.getAttribute("data-ts"),10)||0;
+      if(ts) el.textContent=fmtDur(now-ts);
+    });
+  }, 1000);
+}
+function renderSuepRank(){
+  var box=$("suepRank"); if(!box) return;
+  if(!suepAccesos){ box.innerHTML='<div class="suep-off">SUEP no respondió.</div>'; $("suepRankCnt").textContent=""; return; }
+  var since = suepRange==="today"?suepDayStart() : suepRange==="week"?(Date.now()-7*86400000) : 0;
+  var arr=suepRankData(since);
+  $("suepRankCnt").textContent=arr.length+" usuario"+(arr.length===1?"":"s");
+  if(!arr.length){ box.innerHTML='<div class="u-empty">Sin ingresos en este período.</div>'; return; }
+  var max=arr[0].count||1;
+  box.innerHTML=arr.slice(0,40).map(function(u,i){
+    var pct=Math.round((u.count/max)*100);
+    var avc=isAdminRol(u.rol)?"adm":"";
+    var ago=u.last?fmtAgo(Date.now()-u.last):"—";
+    return '<div class="u-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(u.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+esc(u.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(u.rol||"")+' · último acceso hace '+ago+'</div>'+
+        '<div class="u-bar"><i style="width:'+pct+'%"></i></div></div>'+
+      '<div class="u-right"><div class="u-count">'+u.count+'<span class="lbl">ingreso'+(u.count===1?"":"s")+'</span></div></div>'+
+      '</div>';
+  }).join("");
+}
+function renderSuepKPIs(){
+  if(!suepAccesos){ ["skConnected","skToday","skWeekUsers","skWeek"].forEach(function(id){ var e=$(id); if(e)e.textContent="—"; }); return; }
+  var now=Date.now(), dayS=suepDayStart();
+  var conn=suepAccesos.filter(function(a){
+    return a.activo===true && (now-(a.entradaTs||0))<=SUEP_STALE_MS && (a.entradaTs||0)>=dayS;
+  }).length;
+  var day=suepDayStart(), wk=Date.now()-7*86400000;
+  var today=0, week=0, wkUsers={};
+  suepAccesos.forEach(function(a){
+    var ts=a.entradaTs||0;
+    if(ts>=day) today++;
+    if(ts>=wk){ week++; wkUsers[a.usuario||a.nombre]=true; }
+  });
+  tween($("skConnected"), conn, function(v){ return String(Math.round(v)); });
+  tween($("skToday"), today, function(v){ return String(Math.round(v)); });
+  tween($("skWeekUsers"), Object.keys(wkUsers).length, function(v){ return String(Math.round(v)); });
+  tween($("skWeek"), week, function(v){ return String(Math.round(v)); });
+}
+/* ===== Última actividad: por cada usuario NO conectado, su último acceso ===== */
+function renderSuepActivity(){
+  var box=$("suepActivity"); if(!box) return;
+  if(!suepAccesos){ box.innerHTML='<div class="suep-off">SUEP no respondió.</div>'; $("suepActCnt").textContent=""; return; }
+  var now=Date.now();
+  /* quiénes están conectados ahora (para excluirlos de esta lista) */
+  var conectados={};
+  suepAccesos.forEach(function(a){
+    if(a.activo===true && (now-(a.entradaTs||0))<=SUEP_STALE_MS && (a.entradaTs||0)>=suepDayStart())
+      conectados[a.usuario||a.nombre]=true;
+  });
+  /* último acceso de cada usuario (registro más reciente por entradaTs) */
+  var map={};
+  suepAccesos.forEach(function(a){
+    var k=a.usuario||a.nombre, ts=a.entradaTs||0;
+    if(!map[k] || ts>map[k].entradaTs) map[k]=a;
+  });
+  var arr=Object.keys(map)
+    .filter(function(k){ return !conectados[k]; })   /* excluir conectados ahora */
+    .map(function(k){ return map[k]; })
+    .sort(function(x,y){ return (y.entradaTs||0)-(x.entradaTs||0); });   /* más reciente primero */
+
+  $("suepActCnt").textContent=arr.length+" usuario"+(arr.length===1?"":"s");
+  if(!arr.length){ box.innerHTML='<div class="u-empty">Sin actividad previa registrada.</div>'; return; }
+  box.innerHTML=arr.slice(0,60).map(function(a){
+    var avc=isAdminRol(a.rol)?"adm":"";
+    var ago=a.entradaTs?fmtAgo(now-a.entradaTs):"—";
+    var fecha=(a.entrada||"").split(", ")[0]||"";
+    var hora=(a.entrada||"").split(", ")[1]||"";
+    /* duración de la última sesión (viene de SUEP; "—" si quedó abierta) */
+    var dur=(a.duracion && a.duracion!=="—") ? a.duracion : "sin registro";
+    return '<div class="u-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(a.rol||"")+' · '+esc(fecha)+' '+esc(hora)+'</div>'+
+        '<div class="u-sub">⏱ estuvo '+esc(dur)+'</div></div>'+
+      '<div class="u-right"><div class="u-ago">hace '+esc(ago)+'</div><div class="u-sub" style="margin-top:2px">última vez</div></div>'+
+      '</div>';
+  }).join("");
+}
+function renderSuepAll(){ renderSuepKPIs(); renderSuepNow(); renderSuepRank(); renderSuepActivity();
+  var c=$("suepClock"); if(c) c.textContent="actualizado "+nowClock(); }
+function refreshSuep(){
+  return fetchSuepAccesos().then(function(list){ suepAccesos=list; renderSuepAll(); });
+}
+
+/* ===== Grafo neuronal animado del hero (estilo Agentic OS) ===== */
+(function(){
+  var cv=$("neuralCanvas"); if(!cv) return;
+  var ctx=cv.getContext("2d"), W=0, H=0, DPR=Math.min(2,window.devicePixelRatio||1);
+  var nodes=[], N=REDUCED?0:52, raf=null;
+  function resize(){
+    var r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  function init(){
+    resize(); nodes=[];
+    var cx=W/2, cy=H*0.46;
+    for(var i=0;i<N;i++){
+      var ang=Math.random()*Math.PI*2, rad=Math.pow(Math.random(),0.6)*Math.min(W,H)*0.42;
+      nodes.push({ x:cx+Math.cos(ang)*rad, y:cy+Math.sin(ang)*rad,
+        vx:(Math.random()-0.5)*0.22, vy:(Math.random()-0.5)*0.22,
+        r:0.7+Math.random()*1.9, br:Math.random() });
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    var cx=W/2, cy=H*0.46, link=Math.min(W,H)*0.17;
+    for(var i=0;i<nodes.length;i++){
+      var n=nodes[i];
+      n.x+=n.vx; n.y+=n.vy;
+      var dx=n.x-cx, dy=n.y-cy, d=Math.sqrt(dx*dx+dy*dy), lim=Math.min(W,H)*0.46;
+      if(d>lim){ n.vx-=dx/d*0.02; n.vy-=dy/d*0.02; }
+      if(n.x<0||n.x>W) n.vx*=-1; if(n.y<0||n.y>H) n.vy*=-1;
+    }
+    for(var a=0;a<nodes.length;a++){
+      for(var b=a+1;b<nodes.length;b++){
+        var p=nodes[a], q=nodes[b], ddx=p.x-q.x, ddy=p.y-q.y, dist=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(dist<link){
+          var al=(1-dist/link)*0.32;
+          ctx.strokeStyle="rgba(200,241,53,"+al.toFixed(3)+")";
+          ctx.lineWidth=0.6;
+          ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+        }
+      }
+    }
+    for(var k=0;k<nodes.length;k++){
+      var m=nodes[k];
+      m.br+=0.012; var glow=0.55+0.45*Math.sin(m.br);
+      var dcx=m.x-cx, dcy=m.y-cy, dc=Math.sqrt(dcx*dcx+dcy*dcy), core=dc<Math.min(W,H)*0.12;
+      ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
+      ctx.fillStyle=core?"rgba(224,255,140,"+glow.toFixed(3)+")":"rgba(168,217,42,"+(glow*0.8).toFixed(3)+")";
+      ctx.shadowColor="rgba(200,241,53,.7)"; ctx.shadowBlur=core?10:5;
+      ctx.fill(); ctx.shadowBlur=0;
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  if(N>0){ init(); draw(); window.addEventListener("resize",function(){ if(raf)cancelAnimationFrame(raf); init(); draw(); }); }
+})();
+
+/* ===== Tiempo: Cutral-Có y Plaza Huincul (Open-Meteo, sin API key) ===== */
+var WX_CITIES=[
+  { id:1, lat:-38.9333, lon:-69.2333 },  /* Cutral-Có */
+  { id:2, lat:-38.9200, lon:-69.2000 }   /* Plaza Huincul */
+];
+function wxCode(c){
+  /* WMO weather codes → emoji + texto */
+  if(c===0) return ["☀️","Despejado"];
+  if(c===1||c===2) return ["🌤️","Parcial"];
+  if(c===3) return ["☁️","Nublado"];
+  if(c===45||c===48) return ["🌫️","Niebla"];
+  if(c>=51&&c<=57) return ["🌦️","Llovizna"];
+  if(c>=61&&c<=67) return ["🌧️","Lluvia"];
+  if(c>=71&&c<=77) return ["🌨️","Nieve"];
+  if(c>=80&&c<=82) return ["🌧️","Chaparrones"];
+  if(c>=85&&c<=86) return ["🌨️","Nevadas"];
+  if(c>=95) return ["⛈️","Tormenta"];
+  return ["🌡️","—"];
+}
+function fetchWeather(){
+  var box=$("weather"); if(!box) return;
+  WX_CITIES.forEach(function(c){
+    var url="https://api.open-meteo.com/v1/forecast?latitude="+c.lat+"&longitude="+c.lon+
+            "&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,wind_speed_10m&timezone=America%2FArgentina%2FSalta";
+    fetch(url).then(function(r){ return r.json(); }).then(function(j){
+      if(!j || !j.current) return;
+      var cur=j.current, wc=wxCode(cur.weather_code);
+      $("wx"+c.id+"ico").textContent=wc[0];
+      $("wx"+c.id+"temp").textContent=Math.round(cur.temperature_2m)+"°";
+      $("wx"+c.id+"desc").textContent=wc[1]+" · ST "+Math.round(cur.apparent_temperature)+"°";
+      if(c.id===1){
+        $("wxMeta").innerHTML="💧 "+cur.relative_humidity_2m+"% · 💨 "+Math.round(cur.wind_speed_10m)+" km/h<br>actualizado "+nowClock();
+      }
+      box.style.display="";
+    }).catch(function(){ /* silencioso: si no hay red, no muestra el widget */ });
+  });
+}
+
+/* ===== Música original de CENTINELA ("Vigília") =====
+   Paisaje sonoro generado en vivo con Web Audio: un drone grave de base, un pad
+   de acordes que evoluciona, un latido tenue tipo sonar y un ping de radar
+   periódico. Nada de archivos externos; es la identidad sonora de la app. */
+var MUSIC_KEY="centinela.music.v1";
+var musicOn=false, actx=null, aMaster=null, aTimers=[], aNodes=[];
+
+function musicStart(){
+  if(actx) return;
+  try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+  }catch(e){ actx=null; return; }
+  var ctx=actx;
+
+  /* cadena maestra con un filtro suave y compresor para que no sature */
+  aMaster=ctx.createGain(); aMaster.gain.value=0;
+  var comp=ctx.createDynamicsCompressor();
+  comp.threshold.value=-18; comp.ratio.value=4; comp.attack.value=0.01; comp.release.value=0.3;
+  var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=2600; lp.Q.value=0.6;
+  aMaster.connect(lp); lp.connect(comp); comp.connect(ctx.destination);
+
+  /* --- Drone grave de base (Re): dos osciladores levemente desafinados --- */
+  [55.00, 55.35].forEach(function(f,i){
+    var o=ctx.createOscillator(), g=ctx.createGain();
+    o.type="sawtooth"; o.frequency.value=f; g.gain.value=0.05;
+    var df=ctx.createBiquadFilter(); df.type="lowpass"; df.frequency.value=380;
+    o.connect(df); df.connect(g); g.connect(aMaster); o.start();
+    aNodes.push(o,g,df);
+  });
+
+  /* --- Pad de acordes que evoluciona (progresión Dm - Bb - F - C) --- */
+  var chords=[
+    [146.83,174.61,220.00],  /* Re menor */
+    [116.54,146.83,174.61],  /* Sib mayor */
+    [174.61,220.00,261.63],  /* Fa mayor */
+    [130.81,164.81,196.00]   /* Do mayor */
+  ];
+  var padGain=ctx.createGain(); padGain.gain.value=0.0; padGain.connect(aMaster);
+  var padOscs=[];
+  for(var v=0; v<3; v++){
+    var o=ctx.createOscillator(), g=ctx.createGain();
+    o.type="triangle"; o.frequency.value=chords[0][v]; g.gain.value=0.16;
+    o.connect(g); g.connect(padGain); o.start();
+    padOscs.push(o); aNodes.push(o,g);
+  }
+  aNodes.push(padGain);
+  padGain.gain.setTargetAtTime(0.9, ctx.currentTime+1, 3);
+  var ci=0;
+  var chordTimer=setInterval(function(){
+    if(!actx) return;
+    ci=(ci+1)%chords.length;
+    for(var v=0; v<3; v++){ padOscs[v].frequency.setTargetAtTime(chords[ci][v], actx.currentTime, 1.6); }
+  }, 8000);
+  aTimers.push(chordTimer);
+
+  /* --- LFO lento sobre el pad (respiración) --- */
+  var lfo=ctx.createOscillator(), lfoG=ctx.createGain();
+  lfo.frequency.value=0.06; lfoG.gain.value=0.25;
+  lfo.connect(lfoG); lfoG.connect(padGain.gain); lfo.start();
+  aNodes.push(lfo,lfoG);
+
+  /* --- Latido/sonar tenue cada ~4.2s (sincronizado con el radar visual) --- */
+  function heartbeat(){
+    if(!actx) return;
+    var t=actx.currentTime;
+    var o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(55,t+0.18);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.22,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+    o.connect(g); g.connect(aMaster); o.start(t); o.stop(t+0.45);
+  }
+  var beatTimer=setInterval(heartbeat, 4200); aTimers.push(beatTimer);
+  setTimeout(heartbeat, 400);
+
+  /* --- Ping de radar cada ~12s: una nota cristalina que decae --- */
+  function radarPing(){
+    if(!actx) return;
+    var t=actx.currentTime, notes=[880,987.77,1174.66];
+    var f=notes[Math.floor(Math.random()*notes.length)];
+    var o=actx.createOscillator(), g=actx.createGain();
+    o.type="sine"; o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.10,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+1.8);
+    var pf=actx.createBiquadFilter(); pf.type="bandpass"; pf.frequency.value=f; pf.Q.value=6;
+    o.connect(pf); pf.connect(aMaster); o.start(t); o.stop(t+1.9);
+  }
+  var pingTimer=setInterval(radarPing, 12000); aTimers.push(pingTimer);
+  setTimeout(radarPing, 2000);
+
+  /* fade-in general del máster a volumen audible */
+  aMaster.gain.setTargetAtTime(0.42, ctx.currentTime+0.2, 2.5);
+}
+function musicStop(){
+  if(!actx) return;
+  var ctx=actx;
+  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4); }catch(e){}
+  aTimers.forEach(function(t){ clearInterval(t); }); aTimers=[];
+  actx=null; aMaster=null; aNodes=[];
+  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 800);
+}
+function setMusic(on){
+  musicOn=on; safeSet(MUSIC_KEY, on?"1":"0");
+  var b=$("musicBtn"); if(b){ b.classList.toggle("on",on); b.textContent=on?"🎵 Música ON":"🎵 Música"; }
+  if(on){ musicStart(); if(actx && actx.state==="suspended") actx.resume(); }
+  else musicStop();
+}
+function toggleMusic(){ setMusic(!musicOn); }
+
+/* Autoplay robusto: intenta arrancar; si el navegador lo bloquea (lo normal),
+   deja todo listo y arranca con el PRIMER gesto del usuario en cualquier lado. */
+function initMusic(){
+  var b=$("musicBtn"); if(b) b.addEventListener("click", toggleMusic);
+  var pref=safeGet(MUSIC_KEY);
+  var want = pref===null ? true : pref==="1";   /* por defecto: intenta sonar sola */
+  if(!want){ setMusic(false); return; }
+  setMusic(true);
+  /* si quedó suspendido por política de autoplay, enganchar el primer gesto */
+  var unlock=function(){
+    if(actx && actx.state==="suspended") actx.resume();
+    else if(!actx && musicOn) musicStart();
+    if(actx && actx.state!=="running") return;   /* seguir esperando si aún no corre */
+    document.removeEventListener("pointerdown",unlock);
+    document.removeEventListener("keydown",unlock);
+    document.removeEventListener("touchstart",unlock);
+  };
+  document.addEventListener("pointerdown",unlock);
+  document.addEventListener("keydown",unlock);
+  document.addEventListener("touchstart",unlock);
+}
+
 /* ===== Tarjetas iniciales ===== */
 function buildCards(){
   $("brandSub").textContent="Centro de Monitoreo · "+cfg.apps.length+" aplicaciones";
@@ -1214,11 +1800,26 @@ document.querySelectorAll("#userPick .up-btn").forEach(function(b){
 });
 $("userBtn").addEventListener("click", openUserPick);
 
+/* Pestañas del ranking SUEP */
+(function(){
+  var tabs=$("suepTabs"); if(!tabs) return;
+  tabs.querySelectorAll(".suep-tab").forEach(function(b){
+    b.addEventListener("click", function(){
+      tabs.querySelectorAll(".suep-tab").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on"); suepRange=b.getAttribute("data-range"); renderSuepRank();
+    });
+  });
+})();
+
 /* ===== Arranque: el primer escaneo es profundo (detecta columnas y valida todo) ===== */
 buildCards();
 renderIncidents();
 if(getUser()){ showGreeting(); } else { openUserPick(); }
 typeLine("Iniciando núcleo de monitoreo…");
+fetchWeather();
+setInterval(fetchWeather, 15*60000);   /* tiempo cada 15 min */
+initMusic();
+startSuepTimers();
 startAutoScan();
 scanAll(true);
 </script>
