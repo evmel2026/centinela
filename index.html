@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.10.0">
+<meta name="app-version" content="4.12.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1317,7 +1317,8 @@ function suepRankData(sinceMs){
   arr.sort(function(x,y){ return y.count-x.count || y.last-x.last; });
   return arr;
 }
-var SUEP_STALE_MS=4*3600000;   /* red de seguridad: sesión activa >4h se marca sin cerrar */
+var SUEP_STALE_MS=30*60000;   /* una sesión activa sin actividad hace +30 min se considera cerrada
+                                 (la mayoría sale sin desloguear; sesión típica ~30 min) */
 /* orden de prioridad de roles para agrupar */
 var ROL_ORDER=["Administradora","Administrativa","Jefe de Guardia","Instructor","Logístico"];
 function rolRank(rol){ var i=ROL_ORDER.indexOf(rol); return i<0?99:i; }
@@ -1567,21 +1568,20 @@ function fetchWeather(){
   });
 }
 
-/* ===== Música original de CENTINELA ("Vanguardia") =====
-   Banda de sonido épica/cinematográfica generada en vivo con Web Audio, en la
-   línea de los scores de trailers de acción (brass sintético en capas, ostinato
-   de cuerdas staccato, sub-bass profundo, golpes de percusión grandes y risers).
-   Es una obra ORIGINAL con esa estética; no reproduce música con derechos. */
+/* ===== Ambiente sonoro de CENTINELA ("Sereno") =====
+   Un pad atmosférico suave y discreto generado en vivo: un acorde cálido que
+   respira y cambia muy lentamente, con reverb. Sin ritmo, sin golpes, sin beat.
+   Pensado para acompañar el monitoreo sin molestar. */
 var MUSIC_KEY="centinela.music.v1";
 var musicOn=false, actx=null, aMaster=null, aTimers=[], aNodes=[];
-var seqStep=0, seqTimer=null;
+var padOscs=[], seqTimer=null;
 
-/* progresión épica en Re menor (i - VI - III - VII): oscura y heroica */
-var PROG=[
-  { root:73.42,  triad:[146.83,174.61,220.00] },  /* Re menor */
-  { root:58.27,  triad:[116.54,146.83,174.61] },  /* Sib mayor */
-  { root:87.31,  triad:[174.61,220.00,261.63] },  /* Fa mayor */
-  { root:65.41,  triad:[130.81,164.81,196.00] }   /* Do mayor */
+/* progresión lenta y cálida (acordes de 3 notas, en Re) */
+var PADCHORDS=[
+  [146.83,220.00,293.66],  /* Re - La - Re */
+  [130.81,196.00,261.63],  /* Do - Sol - Do */
+  [174.61,220.00,293.66],  /* Fa - La - Re */
+  [164.81,220.00,246.94]   /* Mi - La - Si */
 ];
 
 function musicStart(){
@@ -1590,120 +1590,62 @@ function musicStart(){
   catch(e){ actx=null; return; }
   var ctx=actx;
 
-  /* máster con compresor fuerte para pegada cinematográfica */
+  /* máster suave con reverb amplio */
   aMaster=ctx.createGain(); aMaster.gain.value=0;
-  var comp=ctx.createDynamicsCompressor();
-  comp.threshold.value=-14; comp.ratio.value=6; comp.attack.value=0.003; comp.release.value=0.28;
-  aMaster.connect(comp); comp.connect(ctx.destination);
+  var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=1400; lp.Q.value=0.4;
+  aMaster.connect(lp); lp.connect(ctx.destination);
 
-  /* reverb largo (sala grande) para épica */
-  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.32;
-  var len=Math.floor(ctx.sampleRate*2.6), imp=ctx.createBuffer(2,len,ctx.sampleRate);
+  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.4;
+  var len=Math.floor(ctx.sampleRate*3.2), imp=ctx.createBuffer(2,len,ctx.sampleRate);
   for(var ch=0; ch<2; ch++){ var dd=imp.getChannelData(ch);
-    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2); } }
-  conv.buffer=imp; rev.connect(conv); conv.connect(comp);
+    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.0); } }
+  conv.buffer=imp; rev.connect(conv); conv.connect(lp);
 
-  /* buses */
-  var subBus=ctx.createGain();   subBus.gain.value=0.95; subBus.connect(aMaster);
-  var brassBus=ctx.createGain(); brassBus.gain.value=0.5; brassBus.connect(aMaster); brassBus.connect(rev);
-  var strBus=ctx.createGain();   strBus.gain.value=0.42; strBus.connect(aMaster); strBus.connect(rev);
-  var hitBus=ctx.createGain();   hitBus.gain.value=0.7; hitBus.connect(aMaster); hitBus.connect(rev);
+  var padGain=ctx.createGain(); padGain.gain.value=0.9; padGain.connect(aMaster); padGain.connect(rev);
 
-  /* --- Sub-bass profundo (fundamento) --- */
-  function playSub(f,t,dur){
+  /* 3 voces sostenidas (una por nota del acorde), tipo sine cálido */
+  padOscs=[];
+  for(var v=0; v<3; v++){
     var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="sine"; o.frequency.value=f;
+    o.type="sine"; o.frequency.value=PADCHORDS[0][v]; g.gain.value=0.22;
+    /* leve segunda voz desafinada para calidez */
     var o2=ctx.createOscillator(), g2=ctx.createGain();
-    o2.type="sawtooth"; o2.frequency.value=f;
-    var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=140;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.6,t+0.04); g.gain.setValueAtTime(0.6,t+dur*0.7); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    g2.gain.value=0.12;
-    o.connect(g); g.connect(subBus);
-    o2.connect(lp); lp.connect(g2); g2.connect(subBus);
-    o.start(t); o.stop(t+dur+0.05); o2.start(t); o2.stop(t+dur+0.05);
+    o2.type="triangle"; o2.frequency.value=PADCHORDS[0][v]*1.003; g2.gain.value=0.08;
+    o.connect(g); g.connect(padGain);
+    o2.connect(g2); g2.connect(padGain);
+    o.start(); o2.start();
+    padOscs.push([o,o2]); aNodes.push(o,g,o2,g2);
   }
-  /* --- Brass sintético en capas (acorde largo y potente con detune) --- */
-  function playBrass(freqs,t,dur){
-    freqs.forEach(function(f){
-      [-6,0,7].forEach(function(cents){   /* 3 voces por nota = grosor */
-        var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-        o.type="sawtooth"; o.frequency.value=f*Math.pow(2,cents/1200);
-        lp.type="lowpass"; lp.frequency.setValueAtTime(700,t); lp.frequency.linearRampToValueAtTime(2400,t+0.5); lp.frequency.linearRampToValueAtTime(1200,t+dur);
-        g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.09,t+0.18); g.gain.setValueAtTime(0.09,t+dur*0.65); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-        o.connect(lp); lp.connect(g); g.connect(brassBus); o.start(t); o.stop(t+dur+0.1);
-      });
-    });
-  }
-  /* --- Ostinato de cuerdas staccato (tensión rítmica) --- */
-  function playStac(f,t){
-    var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-    o.type="sawtooth"; o.frequency.value=f;
-    lp.type="lowpass"; lp.frequency.value=2200;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
-    o.connect(lp); lp.connect(g); g.connect(strBus); o.start(t); o.stop(t+0.18);
-  }
-  /* --- Golpe de trailer (gran impacto: kick + boom + ruido) --- */
-  function playHit(t){
-    var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="sine"; o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(38,t+0.25);
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.9,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
-    o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+0.65);
-    /* capa de ruido (aire del impacto) */
-    var b=ctx.createBufferSource(), nb=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.4),ctx.sampleRate), nd=nb.getChannelData(0);
-    for(var i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.pow(1-i/nd.length,3);
-    b.buffer=nb; var bp=ctx.createBiquadFilter(); bp.type="lowpass"; bp.frequency.value=900;
-    var ng=ctx.createGain(); ng.gain.value=0.35;
-    b.connect(bp); bp.connect(ng); ng.connect(hitBus); ng.connect(rev); b.start(t); b.stop(t+0.4);
-  }
-  /* --- Riser (crescendo de tensión antes de un golpe) --- */
-  function playRiser(t,dur){
-    var o=ctx.createOscillator(), g=ctx.createGain(), bp=ctx.createBiquadFilter();
-    o.type="sawtooth"; o.frequency.setValueAtTime(110,t); o.frequency.exponentialRampToValueAtTime(880,t+dur);
-    bp.type="bandpass"; bp.frequency.setValueAtTime(300,t); bp.frequency.exponentialRampToValueAtTime(3000,t+dur); bp.Q.value=4;
-    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.14,t+dur*0.9); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.1);
-    o.connect(bp); bp.connect(g); g.connect(strBus); g.connect(rev); o.start(t); o.stop(t+dur+0.15);
-  }
+  aNodes.push(padGain);
 
-  /* --- secuenciador cinematográfico: 16 pasos, ~80 BPM (épico, no apurado) --- */
-  var BPM=80, stepDur=(60/BPM)/4;
-  seqStep=0;
-  function tick(){
+  /* LFO muy lento para que "respire" el volumen */
+  var lfo=ctx.createOscillator(), lfoG=ctx.createGain();
+  lfo.frequency.value=0.05; lfoG.gain.value=0.18;
+  lfo.connect(lfoG); lfoG.connect(padGain.gain); lfo.start();
+  aNodes.push(lfo,lfoG);
+
+  /* cambio de acorde muy lento (cada 12 s), con transición suave */
+  var ci=0;
+  var chordTimer=setInterval(function(){
     if(!actx) return;
-    var t=actx.currentTime+0.05;
-    var barAbs=Math.floor(seqStep/16);
-    var bar=barAbs%PROG.length;
-    var s=seqStep%16;
-    var chord=PROG[bar];
-
-    /* golpe grande de trailer en el 1 de cada compás */
-    if(s===0){ playHit(t); playSub(chord.root, t, stepDur*16); }
-    /* refuerzo de sub en el 3 */
-    if(s===8) playSub(chord.root, t, stepDur*8);
-    /* brass sostenido: entra al inicio del compás, dura casi todo */
-    if(s===0) playBrass(chord.triad, t, stepDur*15);
-    /* ostinato de cuerdas staccato: patrón tenso repetido */
-    if(s===0||s===2||s===4||s===6||s===8||s===10||s===12||s===14){
-      playStac(chord.triad[0]*2, t);           /* octava alta = tensión */
-      if(s%4===0) playStac(chord.triad[1]*2, t);
+    ci=(ci+1)%PADCHORDS.length;
+    for(var v=0; v<3; v++){
+      padOscs[v][0].frequency.setTargetAtTime(PADCHORDS[ci][v], actx.currentTime, 3.0);
+      padOscs[v][1].frequency.setTargetAtTime(PADCHORDS[ci][v]*1.003, actx.currentTime, 3.0);
     }
-    /* riser en el último compás de cada vuelta, anticipando el golpe siguiente */
-    if(bar===PROG.length-1 && s===12) playRiser(t, stepDur*4);
+  }, 12000);
+  aTimers.push(chordTimer);
 
-    seqStep++;
-  }
-  seqTimer=setInterval(tick, stepDur*1000);
-  aTimers.push(seqTimer);
-
-  /* fade-in general (entrada dramática) */
-  aMaster.gain.setTargetAtTime(0.55, ctx.currentTime+0.1, 2.2);
+  /* fade-in general, volumen discreto */
+  aMaster.gain.setTargetAtTime(0.32, ctx.currentTime+0.2, 3.0);
 }
 function musicStop(){
   if(!actx) return;
   var ctx=actx;
-  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.35); }catch(e){}
+  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5); }catch(e){}
   aTimers.forEach(function(t){ clearInterval(t); }); aTimers=[];
-  actx=null; aMaster=null; aNodes=[]; seqTimer=null;
-  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 800);
+  actx=null; aMaster=null; aNodes=[]; padOscs=[]; seqTimer=null;
+  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 900);
 }
 function setMusic(on){
   musicOn=on; safeSet(MUSIC_KEY, on?"1":"0");
@@ -1905,4 +1847,5 @@ scanAll(true);
 </script>
 </body>
 </html>
+
 
