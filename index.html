@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.9.0">
+<meta name="app-version" content="4.10.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1567,20 +1567,21 @@ function fetchWeather(){
   });
 }
 
-/* ===== Música original de CENTINELA ("Protocolo") =====
-   Motor rítmico generado en vivo con Web Audio, estilo synthwave / electrónica
-   moderna: bajo con groove, plucks de acordes, hi-hat sutil y arpegio brillante,
-   sobre una progresión que evoluciona. Nada de archivos externos ni drones. */
+/* ===== Música original de CENTINELA ("Vanguardia") =====
+   Banda de sonido épica/cinematográfica generada en vivo con Web Audio, en la
+   línea de los scores de trailers de acción (brass sintético en capas, ostinato
+   de cuerdas staccato, sub-bass profundo, golpes de percusión grandes y risers).
+   Es una obra ORIGINAL con esa estética; no reproduce música con derechos. */
 var MUSIC_KEY="centinela.music.v1";
 var musicOn=false, actx=null, aMaster=null, aTimers=[], aNodes=[];
 var seqStep=0, seqTimer=null;
 
-/* progresión de acordes (frecuencias de la fundamental por compás) */
+/* progresión épica en Re menor (i - VI - III - VII): oscura y heroica */
 var PROG=[
-  { root:146.83, notes:[146.83,174.61,220.00,293.66] },  /* Re menor */
-  { root:174.61, notes:[174.61,220.00,261.63,349.23] },  /* Fa mayor */
-  { root:130.81, notes:[130.81,164.81,196.00,261.63] },  /* Do mayor */
-  { root:196.00, notes:[196.00,246.94,293.66,392.00] }   /* Sol menor-ish */
+  { root:73.42,  triad:[146.83,174.61,220.00] },  /* Re menor */
+  { root:58.27,  triad:[116.54,146.83,174.61] },  /* Sib mayor */
+  { root:87.31,  triad:[174.61,220.00,261.63] },  /* Fa mayor */
+  { root:65.41,  triad:[130.81,164.81,196.00] }   /* Do mayor */
 ];
 
 function musicStart(){
@@ -1589,113 +1590,120 @@ function musicStart(){
   catch(e){ actx=null; return; }
   var ctx=actx;
 
-  /* cadena maestra: filtro + compresor + reverb corto para modernidad */
+  /* máster con compresor fuerte para pegada cinematográfica */
   aMaster=ctx.createGain(); aMaster.gain.value=0;
   var comp=ctx.createDynamicsCompressor();
-  comp.threshold.value=-16; comp.ratio.value=5; comp.attack.value=0.004; comp.release.value=0.25;
+  comp.threshold.value=-14; comp.ratio.value=6; comp.attack.value=0.003; comp.release.value=0.28;
   aMaster.connect(comp); comp.connect(ctx.destination);
 
-  /* reverb por convolución (impulse sintético) para dar aire */
-  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.22;
-  var len=ctx.sampleRate*1.4, imp=ctx.createBuffer(2,len,ctx.sampleRate);
-  for(var ch=0; ch<2; ch++){ var d=imp.getChannelData(ch);
-    for(var i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); } }
+  /* reverb largo (sala grande) para épica */
+  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.32;
+  var len=Math.floor(ctx.sampleRate*2.6), imp=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(var ch=0; ch<2; ch++){ var dd=imp.getChannelData(ch);
+    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2); } }
   conv.buffer=imp; rev.connect(conv); conv.connect(comp);
 
   /* buses */
-  var bassBus=ctx.createGain(); bassBus.gain.value=0.9; bassBus.connect(aMaster);
-  var chordBus=ctx.createGain(); chordBus.gain.value=0.5; chordBus.connect(aMaster); chordBus.connect(rev);
-  var arpBus=ctx.createGain(); arpBus.gain.value=0.32; arpBus.connect(aMaster); arpBus.connect(rev);
-  var drumBus=ctx.createGain(); drumBus.gain.value=0.5; drumBus.connect(aMaster);
+  var subBus=ctx.createGain();   subBus.gain.value=0.95; subBus.connect(aMaster);
+  var brassBus=ctx.createGain(); brassBus.gain.value=0.5; brassBus.connect(aMaster); brassBus.connect(rev);
+  var strBus=ctx.createGain();   strBus.gain.value=0.42; strBus.connect(aMaster); strBus.connect(rev);
+  var hitBus=ctx.createGain();   hitBus.gain.value=0.7; hitBus.connect(aMaster); hitBus.connect(rev);
 
-  /* --- instrumentos --- */
-  function playBass(f,t,dur){
-    var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-    o.type="sawtooth"; o.frequency.value=f/2;
-    lp.type="lowpass"; lp.frequency.setValueAtTime(600,t); lp.frequency.exponentialRampToValueAtTime(180,t+dur);
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.5,t+0.015); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    o.connect(lp); lp.connect(g); g.connect(bassBus); o.start(t); o.stop(t+dur+0.05);
-  }
-  function playPluck(f,t,vel){
-    var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
-    o.type="triangle"; o.frequency.value=f;
-    lp.type="lowpass"; lp.frequency.setValueAtTime(3200,t); lp.frequency.exponentialRampToValueAtTime(700,t+0.25);
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3*(vel||1),t+0.006); g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
-    o.connect(lp); lp.connect(g); g.connect(chordBus); o.start(t); o.stop(t+0.4);
-  }
-  function playArp(f,t){
+  /* --- Sub-bass profundo (fundamento) --- */
+  function playSub(f,t,dur){
     var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="square"; o.frequency.value=f*2;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.12,t+0.004); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
-    o.connect(g); g.connect(arpBus); o.start(t); o.stop(t+0.2);
+    o.type="sine"; o.frequency.value=f;
+    var o2=ctx.createOscillator(), g2=ctx.createGain();
+    o2.type="sawtooth"; o2.frequency.value=f;
+    var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=140;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.6,t+0.04); g.gain.setValueAtTime(0.6,t+dur*0.7); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    g2.gain.value=0.12;
+    o.connect(g); g.connect(subBus);
+    o2.connect(lp); lp.connect(g2); g2.connect(subBus);
+    o.start(t); o.stop(t+dur+0.05); o2.start(t); o2.stop(t+dur+0.05);
   }
-  function playHat(t,open){
-    var b=ctx.createBufferSource(), nb=ctx.createBuffer(1,ctx.sampleRate*0.05,ctx.sampleRate), d=nb.getChannelData(0);
-    for(var i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    b.buffer=nb;
-    var hp=ctx.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=8000;
-    var g=ctx.createGain(); var dur=open?0.12:0.04;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(open?0.14:0.09,t+0.002); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    b.connect(hp); hp.connect(g); g.connect(drumBus); b.start(t); b.stop(t+dur+0.02);
+  /* --- Brass sintético en capas (acorde largo y potente con detune) --- */
+  function playBrass(freqs,t,dur){
+    freqs.forEach(function(f){
+      [-6,0,7].forEach(function(cents){   /* 3 voces por nota = grosor */
+        var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+        o.type="sawtooth"; o.frequency.value=f*Math.pow(2,cents/1200);
+        lp.type="lowpass"; lp.frequency.setValueAtTime(700,t); lp.frequency.linearRampToValueAtTime(2400,t+0.5); lp.frequency.linearRampToValueAtTime(1200,t+dur);
+        g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.09,t+0.18); g.gain.setValueAtTime(0.09,t+dur*0.65); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+        o.connect(lp); lp.connect(g); g.connect(brassBus); o.start(t); o.stop(t+dur+0.1);
+      });
+    });
   }
-  function playKick(t){
+  /* --- Ostinato de cuerdas staccato (tensión rítmica) --- */
+  function playStac(f,t){
+    var o=ctx.createOscillator(), g=ctx.createGain(), lp=ctx.createBiquadFilter();
+    o.type="sawtooth"; o.frequency.value=f;
+    lp.type="lowpass"; lp.frequency.value=2200;
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.connect(lp); lp.connect(g); g.connect(strBus); o.start(t); o.stop(t+0.18);
+  }
+  /* --- Golpe de trailer (gran impacto: kick + boom + ruido) --- */
+  function playHit(t){
     var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="sine"; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.7,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+0.28);
-    o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.3);
+    o.type="sine"; o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(38,t+0.25);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.9,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+    o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+0.65);
+    /* capa de ruido (aire del impacto) */
+    var b=ctx.createBufferSource(), nb=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.4),ctx.sampleRate), nd=nb.getChannelData(0);
+    for(var i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.pow(1-i/nd.length,3);
+    b.buffer=nb; var bp=ctx.createBiquadFilter(); bp.type="lowpass"; bp.frequency.value=900;
+    var ng=ctx.createGain(); ng.gain.value=0.35;
+    b.connect(bp); bp.connect(ng); ng.connect(hitBus); ng.connect(rev); b.start(t); b.stop(t+0.4);
+  }
+  /* --- Riser (crescendo de tensión antes de un golpe) --- */
+  function playRiser(t,dur){
+    var o=ctx.createOscillator(), g=ctx.createGain(), bp=ctx.createBiquadFilter();
+    o.type="sawtooth"; o.frequency.setValueAtTime(110,t); o.frequency.exponentialRampToValueAtTime(880,t+dur);
+    bp.type="bandpass"; bp.frequency.setValueAtTime(300,t); bp.frequency.exponentialRampToValueAtTime(3000,t+dur); bp.Q.value=4;
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.14,t+dur*0.9); g.gain.exponentialRampToValueAtTime(0.0001,t+dur+0.1);
+    o.connect(bp); bp.connect(g); g.connect(strBus); g.connect(rev); o.start(t); o.stop(t+dur+0.15);
   }
 
-  /* --- secuenciador: 16 pasos por compás, ~110 BPM --- */
-  var BPM=110, stepDur=(60/BPM)/4;   /* semicorcheas */
+  /* --- secuenciador cinematográfico: 16 pasos, ~80 BPM (épico, no apurado) --- */
+  var BPM=80, stepDur=(60/BPM)/4;
   seqStep=0;
   function tick(){
     if(!actx) return;
-    var t=actx.currentTime+0.04;
-    var bar=Math.floor(seqStep/16)%PROG.length;
+    var t=actx.currentTime+0.05;
+    var barAbs=Math.floor(seqStep/16);
+    var bar=barAbs%PROG.length;
     var s=seqStep%16;
     var chord=PROG[bar];
 
-    /* kick en 1 y 3 (cada 8 pasos) */
-    if(s===0||s===8) playKick(t);
-    /* hi-hat en cada corchea, abierto en el off-beat */
-    if(s%2===0) playHat(t, s%4===2);
-    /* bajo: patrón con groove (root, root, quinta, root...) */
-    if(s===0||s===3||s===6||s===8||s===11||s===14){
-      var bf = (s===6||s===14) ? chord.root*1.5 : chord.root;
-      playBass(bf, t, stepDur*2.2);
+    /* golpe grande de trailer en el 1 de cada compás */
+    if(s===0){ playHit(t); playSub(chord.root, t, stepDur*16); }
+    /* refuerzo de sub en el 3 */
+    if(s===8) playSub(chord.root, t, stepDur*8);
+    /* brass sostenido: entra al inicio del compás, dura casi todo */
+    if(s===0) playBrass(chord.triad, t, stepDur*15);
+    /* ostinato de cuerdas staccato: patrón tenso repetido */
+    if(s===0||s===2||s===4||s===6||s===8||s===10||s===12||s===14){
+      playStac(chord.triad[0]*2, t);           /* octava alta = tensión */
+      if(s%4===0) playStac(chord.triad[1]*2, t);
     }
-    /* plucks de acordes en el backbeat */
-    if(s===4||s===12){ chord.notes.slice(0,3).forEach(function(nf){ playPluck(nf,t,1); }); }
-    /* arpegio brillante subiendo, en pasos impares */
-    if(s%2===1){ playArp(chord.notes[Math.floor(s/2)%4], t); }
+    /* riser en el último compás de cada vuelta, anticipando el golpe siguiente */
+    if(bar===PROG.length-1 && s===12) playRiser(t, stepDur*4);
 
     seqStep++;
   }
-  /* usar un timer JS que agenda con lookahead corto (suficiente para ambiente) */
   seqTimer=setInterval(tick, stepDur*1000);
   aTimers.push(seqTimer);
 
-  /* --- ping de radar ocasional (guiño a la identidad, cada ~16s) --- */
-  function radarPing(){
-    if(!actx) return;
-    var t=actx.currentTime, f=[880,1174.66,1318.51][Math.floor(Math.random()*3)];
-    var o=ctx.createOscillator(), g=ctx.createGain(), bp=ctx.createBiquadFilter();
-    o.type="sine"; o.frequency.value=f; bp.type="bandpass"; bp.frequency.value=f; bp.Q.value=8;
-    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.07,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+1.4);
-    o.connect(bp); bp.connect(g); g.connect(arpBus); g.connect(rev); o.start(t); o.stop(t+1.5);
-  }
-  var pingTimer=setInterval(radarPing, 16000); aTimers.push(pingTimer);
-
-  /* fade-in general */
-  aMaster.gain.setTargetAtTime(0.5, ctx.currentTime+0.1, 1.8);
+  /* fade-in general (entrada dramática) */
+  aMaster.gain.setTargetAtTime(0.55, ctx.currentTime+0.1, 2.2);
 }
 function musicStop(){
   if(!actx) return;
   var ctx=actx;
-  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.3); }catch(e){}
+  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.35); }catch(e){}
   aTimers.forEach(function(t){ clearInterval(t); }); aTimers=[];
   actx=null; aMaster=null; aNodes=[]; seqTimer=null;
-  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 700);
+  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 800);
 }
 function setMusic(on){
   musicOn=on; safeSet(MUSIC_KEY, on?"1":"0");
