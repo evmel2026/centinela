@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.12.0">
+<meta name="app-version" content="4.13.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1569,19 +1569,21 @@ function fetchWeather(){
 }
 
 /* ===== Ambiente sonoro de CENTINELA ("Sereno") =====
-   Un pad atmosférico suave y discreto generado en vivo: un acorde cálido que
+   Pad atmosférico suave y discreto generado en vivo: un acorde cálido que
    respira y cambia muy lentamente, con reverb. Sin ritmo, sin golpes, sin beat.
-   Pensado para acompañar el monitoreo sin molestar. */
+   Mezcla con etapas de ganancia controladas y un limitador para que nunca
+   sature ni resulte molesto. Pensado para acompañar el monitoreo. */
 var MUSIC_KEY="centinela.music.v1";
 var musicOn=false, actx=null, aMaster=null, aTimers=[], aNodes=[];
 var padOscs=[], seqTimer=null;
 
-/* progresión lenta y cálida (acordes de 3 notas, en Re) */
+/* progresión cálida y consonante (Am – Fa – Do – Sol), voces de registro medio
+   con conducción suave para que no haya barro grave */
 var PADCHORDS=[
-  [146.83,220.00,293.66],  /* Re - La - Re */
-  [130.81,196.00,261.63],  /* Do - Sol - Do */
-  [174.61,220.00,293.66],  /* Fa - La - Re */
-  [164.81,220.00,246.94]   /* Mi - La - Si */
+  [220.00,261.63,329.63],  /* Am : La3 - Do4 - Mi4  */
+  [174.61,220.00,261.63],  /* Fa : Fa3 - La3 - Do4  */
+  [196.00,261.63,329.63],  /* Do : Sol3 - Do4 - Mi4 */
+  [196.00,246.94,293.66]   /* Sol: Sol3 - Si3 - Re4 */
 ];
 
 function musicStart(){
@@ -1590,27 +1592,37 @@ function musicStart(){
   catch(e){ actx=null; return; }
   var ctx=actx;
 
-  /* máster suave con reverb amplio */
+  /* ---- cadena de salida: máster -> filtro cálido -> limitador -> destino ---- */
   aMaster=ctx.createGain(); aMaster.gain.value=0;
-  var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=1400; lp.Q.value=0.4;
-  aMaster.connect(lp); lp.connect(ctx.destination);
 
-  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.4;
-  var len=Math.floor(ctx.sampleRate*3.2), imp=ctx.createBuffer(2,len,ctx.sampleRate);
+  var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=1900; lp.Q.value=0.3;
+
+  /* limitador suave: impide cualquier pico/saturación (clave para que no ensordezca) */
+  var lim=ctx.createDynamicsCompressor();
+  lim.threshold.value=-18; lim.knee.value=24; lim.ratio.value=4;
+  lim.attack.value=0.01; lim.release.value=0.3;
+
+  aMaster.connect(lp); lp.connect(lim); lim.connect(ctx.destination);
+  aNodes.push(aMaster,lp,lim);
+
+  /* reverb amplio y discreto */
+  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.22;
+  var len=Math.floor(ctx.sampleRate*2.8), imp=ctx.createBuffer(2,len,ctx.sampleRate);
   for(var ch=0; ch<2; ch++){ var dd=imp.getChannelData(ch);
-    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.0); } }
+    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2); } }
   conv.buffer=imp; rev.connect(conv); conv.connect(lp);
+  aNodes.push(conv,rev);
 
-  var padGain=ctx.createGain(); padGain.gain.value=0.9; padGain.connect(aMaster); padGain.connect(rev);
+  var padGain=ctx.createGain(); padGain.gain.value=0.8; padGain.connect(aMaster); padGain.connect(rev);
 
-  /* 3 voces sostenidas (una por nota del acorde), tipo sine cálido */
+  /* 3 voces sostenidas (una por nota del acorde), sine cálido + leve desafine */
   padOscs=[];
   for(var v=0; v<3; v++){
     var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="sine"; o.frequency.value=PADCHORDS[0][v]; g.gain.value=0.22;
-    /* leve segunda voz desafinada para calidez */
+    o.type="sine"; o.frequency.value=PADCHORDS[0][v]; g.gain.value=0.13;
+    /* segunda voz apenas desafinada (~3 cents) para dar cuerpo sin batido feo */
     var o2=ctx.createOscillator(), g2=ctx.createGain();
-    o2.type="triangle"; o2.frequency.value=PADCHORDS[0][v]*1.003; g2.gain.value=0.08;
+    o2.type="sine"; o2.frequency.value=PADCHORDS[0][v]*1.0018; g2.gain.value=0.06;
     o.connect(g); g.connect(padGain);
     o2.connect(g2); g2.connect(padGain);
     o.start(); o2.start();
@@ -1618,26 +1630,32 @@ function musicStart(){
   }
   aNodes.push(padGain);
 
-  /* LFO muy lento para que "respire" el volumen */
+  /* LFO muy lento para que "respire" el volumen (sutil) */
   var lfo=ctx.createOscillator(), lfoG=ctx.createGain();
-  lfo.frequency.value=0.05; lfoG.gain.value=0.18;
+  lfo.frequency.value=0.06; lfoG.gain.value=0.05;
   lfo.connect(lfoG); lfoG.connect(padGain.gain); lfo.start();
   aNodes.push(lfo,lfoG);
 
-  /* cambio de acorde muy lento (cada 12 s), con transición suave */
+  /* LFO del filtro: abre y cierra el brillo muy lentamente (movimiento vivo) */
+  var flfo=ctx.createOscillator(), flfoG=ctx.createGain();
+  flfo.type="sine"; flfo.frequency.value=0.03; flfoG.gain.value=450;
+  flfo.connect(flfoG); flfoG.connect(lp.frequency); flfo.start();
+  aNodes.push(flfo,flfoG);
+
+  /* cambio de acorde muy lento (cada 14 s), con transición suave */
   var ci=0;
   var chordTimer=setInterval(function(){
     if(!actx) return;
     ci=(ci+1)%PADCHORDS.length;
     for(var v=0; v<3; v++){
-      padOscs[v][0].frequency.setTargetAtTime(PADCHORDS[ci][v], actx.currentTime, 3.0);
-      padOscs[v][1].frequency.setTargetAtTime(PADCHORDS[ci][v]*1.003, actx.currentTime, 3.0);
+      padOscs[v][0].frequency.setTargetAtTime(PADCHORDS[ci][v], actx.currentTime, 4.0);
+      padOscs[v][1].frequency.setTargetAtTime(PADCHORDS[ci][v]*1.0018, actx.currentTime, 4.0);
     }
-  }, 12000);
+  }, 14000);
   aTimers.push(chordTimer);
 
   /* fade-in general, volumen discreto */
-  aMaster.gain.setTargetAtTime(0.32, ctx.currentTime+0.2, 3.0);
+  aMaster.gain.setTargetAtTime(0.5, ctx.currentTime+0.2, 3.5);
 }
 function musicStop(){
   if(!actx) return;
@@ -1847,5 +1865,4 @@ scanAll(true);
 </script>
 </body>
 </html>
-
 
