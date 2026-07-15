@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.13.0">
+<meta name="app-version" content="4.15.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -88,7 +88,6 @@
   .btn.ghost{background:transparent}
   .btn.sm{padding:6px 10px;font-size:12px}
   .btn.bell.on{border-color:var(--neon);color:var(--neon)}
-  #musicBtn.on{border-color:var(--lime);color:var(--lime)}
 
   /* ===== Hero con radar ===== */
   .hero{display:grid;grid-template-columns:auto 1fr;gap:30px;align-items:center;
@@ -304,6 +303,30 @@
   .u-stale-sep{display:none}
   .u-list{max-height:420px;overflow:auto}
   .suep-off{padding:22px 0;text-align:center;color:var(--warn);font-size:13px;font-family:var(--mono)}
+  /* ===== Alerta de inactividad ===== */
+  .suep-alert{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+  .suep-alert h4{margin:0 0 12px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-family:var(--disp);color:var(--warn);display:flex;align-items:center;gap:8px}
+  .suep-alert h4 .cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:normal;text-transform:none}
+  .alert-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .alert-lbl{font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:.04em}
+  .alert-days{display:flex;gap:6px;flex-wrap:wrap}
+  .suep-alert .u-list{max-height:360px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  @media(max-width:760px){ .suep-alert .u-list{grid-template-columns:1fr} }
+  .alert-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .alert-row .u-av{background:rgba(255,138,74,.14);color:var(--warn)}
+  .alert-row .u-av.adm{background:rgba(255,138,74,.2)}
+  .alert-days-badge{font-family:var(--mono);font-size:12px;color:var(--warn);font-weight:700;white-space:nowrap}
+  .alert-days-badge.warn{color:var(--lime)}
+  .alert-days-badge .lbl{display:block;font-size:9px;color:var(--ink-faint);font-weight:400;letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+  .alert-group-head{grid-column:1/-1;font-family:var(--disp);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:12px 0 5px;display:flex;align-items:center;gap:7px}
+  .alert-group-head:first-child{padding-top:2px}
+  .alert-group-head::before{content:"";width:7px;height:7px;border-radius:50%;flex:none}
+  .alert-group-head.crit{color:var(--warn)} .alert-group-head.crit::before{background:var(--warn)}
+  .alert-group-head.warn{color:var(--lime)} .alert-group-head.warn::before{background:var(--lime)}
+  .alert-row.esp .u-av{background:rgba(200,241,53,.12);color:var(--lime)}
+  .alert-row.esp .u-av.adm{background:rgba(200,241,53,.18)}
+  .alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .alert-empty-ok{padding:18px 0;text-align:center;color:var(--lime);font-size:12.5px;font-family:var(--mono)}
   @media(max-width:760px){
     .suep-hero{grid-template-columns:repeat(2,1fr)}
     .suep-cols{grid-template-columns:1fr;gap:26px}
@@ -418,7 +441,6 @@
     <div class="net" id="netBadge"><span class="dot" style="background:var(--ink-faint)"></span><span id="netText">Sin escanear</span></div>
     <button class="btn primary sm" id="installBtn" style="display:none">⬇ Instalar</button>
     <button class="btn sm" id="userBtn" title="Cambiar de usuaria">👤</button>
-    <button class="btn sm" id="musicBtn" title="Música ambiente">🎵 Música</button>
     <button class="btn bell sm" id="bellBtn" title="Activar notificaciones del navegador">🔔 Avisos</button>
     <button class="btn sm" id="cfgBtn">Configurar</button>
     <button class="btn sm" id="deepBtn" title="Descarga y valida todos los datos (usa más egress)">Escaneo profundo</button>
@@ -486,6 +508,24 @@
     <div class="suep-activity">
       <h4>🕘 Última actividad <span class="cnt" id="suepActCnt"></span></h4>
       <div class="u-list" id="suepActivity"><div class="u-empty">Escaneá para ver la última conexión de cada usuario.</div></div>
+    </div>
+
+    <div class="suep-alert">
+      <h4>🚨 Control de actividad <span class="cnt" id="suepAlertCnt"></span></h4>
+      <div class="alert-controls">
+        <span class="alert-lbl">Ventana de control</span>
+        <div class="alert-days" id="alertDays">
+          <button class="suep-tab" data-days="5">5 días</button>
+          <button class="suep-tab on" data-days="7">7 días</button>
+          <button class="suep-tab" data-days="10">10 días</button>
+          <button class="suep-tab" data-days="15">15 días</button>
+        </div>
+      </div>
+      <div class="u-list" id="suepAlert"><div class="u-empty">Escaneá para detectar personal inactivo.</div></div>
+      <div class="alert-actions" id="alertActions" style="display:none">
+        <button class="btn primary sm" id="alertWaBtn" title="Genera el mensaje y abre WhatsApp para difundirlo al grupo">📣 Difundir al grupo por WhatsApp</button>
+        <button class="btn sm" id="alertCopyBtn" title="Copia el mensaje de alerta al portapapeles">⧉ Copiar mensaje</button>
+      </div>
     </div>
   </div>
 
@@ -1248,7 +1288,7 @@ function setNet(s){
 function exportReport(){
   if(!lastResults){ toast("Escaneá al menos una vez antes de exportar"); return; }
   var rep={
-    sistema:"CENTINELA v4.4.0 · Secretaría Académica DCFyCCCO",
+    sistema:"CENTINELA v4.15.0 · Secretaría Académica DCFyCCCO",
     generado:new Date().toLocaleString("es-AR"),
     apps:lastResults.map(function(R){
       return { app:R.app.name, host:host(R.app.url), estado:R.status, modo:R.mode,
@@ -1470,7 +1510,196 @@ function renderSuepActivity(){
       '</div>';
   }).join("");
 }
-function renderSuepAll(){ renderSuepKPIs(); renderSuepNow(); renderSuepRank(); renderSuepActivity();
+/* ===== Alerta de inactividad: personal que no ingresa hace N días =====
+   Detección minuciosa: por cada usuario consolidamos TODOS sus ingresos,
+   no solo el último, y lo clasificamos en un nivel de severidad:
+     · "sin_registro" → nunca ingresó (no tiene ningún acceso con fecha)
+     · "inactivo"     → su último ingreso fue hace ≥ N días
+     · "esporadico"   → entró dentro de la ventana, pero muy poco
+                        (1 solo ingreso en los últimos N días → "entra de paso")
+   El nivel esporádico se muestra aparte como aviso preventivo. */
+var alertDays=7;              /* umbral activo (días sin ingresar) */
+var lastInactivos=[];         /* inactivos duros, para el WhatsApp */
+var lastEsporadicos=[];       /* entran de paso, aviso preventivo */
+
+/* Consolida por usuario: último acceso, total histórico y total en la ventana */
+function suepConsolidar(days){
+  var now=Date.now(), umbral=days*86400000, desde=now-umbral;
+  var map={};
+  (suepAccesos||[]).forEach(function(a){
+    var k=a.usuario||a.nombre; if(!k) return;
+    var ts=a.entradaTs||0;
+    if(!map[k]) map[k]={nombre:a.nombre,usuario:a.usuario,rol:a.rol,
+                        entrada:a.entrada,entradaTs:ts,activo:!!a.activo,
+                        totalWin:0,totalHist:0};
+    var m=map[k];
+    m.totalHist++;
+    if(ts>=desde) m.totalWin++;
+    if(ts>(m.entradaTs||0)){ m.entradaTs=ts; m.entrada=a.entrada; m.rol=a.rol; }
+    if(a.activo===true) m.activo=true;
+  });
+  return map;
+}
+
+/* Inactivos duros: último ingreso hace ≥ N días (o sin registro alguno).
+   Un usuario conectado AHORA nunca se marca inactivo aunque su fila sea vieja. */
+function suepInactivos(days){
+  if(!suepAccesos) return [];
+  var now=Date.now(), umbral=days*86400000;
+  var map=suepConsolidar(days);
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .filter(function(a){
+      if(a.activo===true && (now-(a.entradaTs||0))<=SUEP_STALE_MS) return false; /* está adentro */
+      return (a.entradaTs||0)===0 || (now-(a.entradaTs||0))>=umbral;
+    })
+    .sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });  /* el más inactivo primero */
+}
+
+/* Esporádicos: entraron dentro de la ventana pero un único ingreso → "de paso" */
+function suepEsporadicos(days){
+  if(!suepAccesos) return [];
+  var now=Date.now(), umbral=days*86400000;
+  var map=suepConsolidar(days);
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .filter(function(a){
+      if((a.entradaTs||0)===0) return false;
+      if((now-(a.entradaTs||0))>=umbral) return false;   /* ese ya es inactivo */
+      return a.totalWin<=1;                              /* un solo ingreso en la ventana */
+    })
+    .sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });
+}
+
+function diasSin(a){ var now=Date.now(); var ts=a.entradaTs||0; return ts?Math.floor((now-ts)/86400000):null; }
+
+function renderSuepAlert(){
+  var box=$("suepAlert"); if(!box) return;
+  var actions=$("alertActions");
+  if(!suepAccesos){
+    box.innerHTML='<div class="suep-off">SUEP no respondió.</div>';
+    $("suepAlertCnt").textContent=""; if(actions) actions.style.display="none"; lastInactivos=[]; return;
+  }
+  var arr=suepInactivos(alertDays);
+  var esp=suepEsporadicos(alertDays);
+  lastInactivos=arr;
+  lastEsporadicos=esp;
+  var totalAvisos=arr.length+esp.length;
+  $("suepAlertCnt").textContent=totalAvisos+(totalAvisos===1?" aviso":" avisos");
+  if(!arr.length && !esp.length){
+    box.innerHTML='<div class="alert-empty-ok">✓ Todo el personal ingresó y participó dentro de los últimos '+alertDays+' días.</div>';
+    if(actions) actions.style.display="none"; return;
+  }
+  var html="";
+
+  if(arr.length){
+    html+='<div class="alert-group-head crit">Sin ingresar hace '+alertDays+' días o más · '+arr.length+'</div>';
+    html+=arr.slice(0,80).map(function(a){
+      var avc=isAdminRol(a.rol)?"adm":"";
+      var d=diasSin(a);
+      var fecha=(a.entrada||"").split(", ")[0]||"";
+      var badge=(d===null)
+        ? '<div class="alert-days-badge">—<span class="lbl">nunca ingresó</span></div>'
+        : '<div class="alert-days-badge">'+d+'<span class="lbl">días sin ingresar</span></div>';
+      return '<div class="alert-row">'+
+        '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+        '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+          '<div class="u-sub">'+esc(a.rol||"Sin rol")+'</div>'+
+          '<div class="u-sub">último ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
+        '<div class="u-right">'+badge+'</div>'+
+        '</div>';
+    }).join("");
+  }
+
+  if(esp.length){
+    html+='<div class="alert-group-head warn">Entran de paso · un solo ingreso en '+alertDays+' días · '+esp.length+'</div>';
+    html+=esp.slice(0,80).map(function(a){
+      var avc=isAdminRol(a.rol)?"adm":"";
+      var d=diasSin(a);
+      var fecha=(a.entrada||"").split(", ")[0]||"";
+      return '<div class="alert-row esp">'+
+        '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+        '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+          '<div class="u-sub">'+esc(a.rol||"Sin rol")+'</div>'+
+          '<div class="u-sub">único ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
+        '<div class="u-right"><div class="alert-days-badge warn">'+(d===null?"—":d)+'<span class="lbl">días · 1 ingreso</span></div></div>'+
+        '</div>';
+    }).join("");
+  }
+
+  box.innerHTML=html;
+  if(actions) actions.style.display="flex";
+}
+
+/* Arma el texto de la alerta para difundir por WhatsApp */
+function buildAlertMessage(){
+  if(!lastInactivos.length && !lastEsporadicos.length) return "";
+  var now=new Date();
+  var hoy=now.toLocaleDateString("es-AR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+  var hora=now.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+  var L=[];
+  L.push("🚨 *SUEP · CONTROL DE ACTIVIDAD*");
+  L.push("Secretaría Académica · DCFyCCCO");
+  L.push("📅 "+hoy+" · "+hora+" hs");
+  L.push("━━━━━━━━━━━━━━━━━━");
+
+  if(lastInactivos.length){
+    L.push("");
+    L.push("⛔ *SIN INGRESAR HACE "+alertDays+" DÍAS O MÁS*");
+    L.push("_Personal que no registra actividad en el sistema:_");
+    L.push("");
+    lastInactivos.forEach(function(a,i){
+      var fecha=(a.entrada||"").split(", ")[0]||"sin registro previo";
+      var d=diasSin(a);
+      var linea=(d===null)
+        ? "   ⚠️ Nunca ingresó al sistema"
+        : "   ⏳ "+d+" días sin ingresar · último: "+fecha;
+      L.push("*"+(i+1)+". "+a.nombre+"*  ("+(a.rol||"Sin rol")+")");
+      L.push(linea);
+    });
+  }
+
+  if(lastEsporadicos.length){
+    L.push("");
+    L.push("🟡 *INGRESO ESPORÁDICO*");
+    L.push("_Ingresaron una sola vez en los últimos "+alertDays+" días:_");
+    L.push("");
+    lastEsporadicos.forEach(function(a,i){
+      var fecha=(a.entrada||"").split(", ")[0]||"sin registro";
+      L.push("*"+(i+1)+". "+a.nombre+"*  ("+(a.rol||"Sin rol")+")");
+      L.push("   • Único ingreso: "+fecha);
+    });
+  }
+
+  L.push("");
+  L.push("━━━━━━━━━━━━━━━━━━");
+  L.push("📌 Se solicita regularizar el ingreso y la carga de novedades a la brevedad.");
+  L.push("Ante cualquier inconveniente de acceso, comunicarse con Secretaría Académica.");
+  L.push("");
+  L.push("🛰️ _Detectado automáticamente por CENTINELA · Centro de Monitoreo_");
+  L.push("_Desarrollado por MLF&EV · Secretaría Académica DCFyCCCO_");
+  return L.join("\n");
+}
+function difundirAlerta(){
+  var msg=buildAlertMessage();
+  if(!msg){ toast("No hay personal inactivo para difundir."); return; }
+  /* WhatsApp: abre el selector de chat/grupo con el texto ya cargado */
+  var url="https://wa.me/?text="+encodeURIComponent(msg);
+  window.open(url,"_blank");
+}
+function copiarAlerta(){
+  var msg=buildAlertMessage();
+  if(!msg){ return; }
+  var done=function(){ var b=$("alertCopyBtn"); if(b){ var t=b.textContent; b.textContent="✓ Copiado"; setTimeout(function(){ b.textContent=t; },1800); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(done).catch(function(){ fallbackCopy(msg); done(); });
+  } else { fallbackCopy(msg); done(); }
+}
+function fallbackCopy(text){
+  var ta=document.createElement("textarea"); ta.value=text;
+  ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+  ta.select(); try{ document.execCommand("copy"); }catch(e){} document.body.removeChild(ta);
+}
+
+function renderSuepAll(){ renderSuepKPIs(); renderSuepNow(); renderSuepRank(); renderSuepActivity(); renderSuepAlert();
   var c=$("suepClock"); if(c) c.textContent="actualizado "+nowClock(); }
 function refreshSuep(){
   return fetchSuepAccesos().then(function(list){ suepAccesos=list; renderSuepAll(); });
@@ -1568,132 +1797,6 @@ function fetchWeather(){
   });
 }
 
-/* ===== Ambiente sonoro de CENTINELA ("Sereno") =====
-   Pad atmosférico suave y discreto generado en vivo: un acorde cálido que
-   respira y cambia muy lentamente, con reverb. Sin ritmo, sin golpes, sin beat.
-   Mezcla con etapas de ganancia controladas y un limitador para que nunca
-   sature ni resulte molesto. Pensado para acompañar el monitoreo. */
-var MUSIC_KEY="centinela.music.v1";
-var musicOn=false, actx=null, aMaster=null, aTimers=[], aNodes=[];
-var padOscs=[], seqTimer=null;
-
-/* progresión cálida y consonante (Am – Fa – Do – Sol), voces de registro medio
-   con conducción suave para que no haya barro grave */
-var PADCHORDS=[
-  [220.00,261.63,329.63],  /* Am : La3 - Do4 - Mi4  */
-  [174.61,220.00,261.63],  /* Fa : Fa3 - La3 - Do4  */
-  [196.00,261.63,329.63],  /* Do : Sol3 - Do4 - Mi4 */
-  [196.00,246.94,293.66]   /* Sol: Sol3 - Si3 - Re4 */
-];
-
-function musicStart(){
-  if(actx) return;
-  try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }
-  catch(e){ actx=null; return; }
-  var ctx=actx;
-
-  /* ---- cadena de salida: máster -> filtro cálido -> limitador -> destino ---- */
-  aMaster=ctx.createGain(); aMaster.gain.value=0;
-
-  var lp=ctx.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=1900; lp.Q.value=0.3;
-
-  /* limitador suave: impide cualquier pico/saturación (clave para que no ensordezca) */
-  var lim=ctx.createDynamicsCompressor();
-  lim.threshold.value=-18; lim.knee.value=24; lim.ratio.value=4;
-  lim.attack.value=0.01; lim.release.value=0.3;
-
-  aMaster.connect(lp); lp.connect(lim); lim.connect(ctx.destination);
-  aNodes.push(aMaster,lp,lim);
-
-  /* reverb amplio y discreto */
-  var conv=ctx.createConvolver(), rev=ctx.createGain(); rev.gain.value=0.22;
-  var len=Math.floor(ctx.sampleRate*2.8), imp=ctx.createBuffer(2,len,ctx.sampleRate);
-  for(var ch=0; ch<2; ch++){ var dd=imp.getChannelData(ch);
-    for(var i=0;i<len;i++){ dd[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2); } }
-  conv.buffer=imp; rev.connect(conv); conv.connect(lp);
-  aNodes.push(conv,rev);
-
-  var padGain=ctx.createGain(); padGain.gain.value=0.8; padGain.connect(aMaster); padGain.connect(rev);
-
-  /* 3 voces sostenidas (una por nota del acorde), sine cálido + leve desafine */
-  padOscs=[];
-  for(var v=0; v<3; v++){
-    var o=ctx.createOscillator(), g=ctx.createGain();
-    o.type="sine"; o.frequency.value=PADCHORDS[0][v]; g.gain.value=0.13;
-    /* segunda voz apenas desafinada (~3 cents) para dar cuerpo sin batido feo */
-    var o2=ctx.createOscillator(), g2=ctx.createGain();
-    o2.type="sine"; o2.frequency.value=PADCHORDS[0][v]*1.0018; g2.gain.value=0.06;
-    o.connect(g); g.connect(padGain);
-    o2.connect(g2); g2.connect(padGain);
-    o.start(); o2.start();
-    padOscs.push([o,o2]); aNodes.push(o,g,o2,g2);
-  }
-  aNodes.push(padGain);
-
-  /* LFO muy lento para que "respire" el volumen (sutil) */
-  var lfo=ctx.createOscillator(), lfoG=ctx.createGain();
-  lfo.frequency.value=0.06; lfoG.gain.value=0.05;
-  lfo.connect(lfoG); lfoG.connect(padGain.gain); lfo.start();
-  aNodes.push(lfo,lfoG);
-
-  /* LFO del filtro: abre y cierra el brillo muy lentamente (movimiento vivo) */
-  var flfo=ctx.createOscillator(), flfoG=ctx.createGain();
-  flfo.type="sine"; flfo.frequency.value=0.03; flfoG.gain.value=450;
-  flfo.connect(flfoG); flfoG.connect(lp.frequency); flfo.start();
-  aNodes.push(flfo,flfoG);
-
-  /* cambio de acorde muy lento (cada 14 s), con transición suave */
-  var ci=0;
-  var chordTimer=setInterval(function(){
-    if(!actx) return;
-    ci=(ci+1)%PADCHORDS.length;
-    for(var v=0; v<3; v++){
-      padOscs[v][0].frequency.setTargetAtTime(PADCHORDS[ci][v], actx.currentTime, 4.0);
-      padOscs[v][1].frequency.setTargetAtTime(PADCHORDS[ci][v]*1.0018, actx.currentTime, 4.0);
-    }
-  }, 14000);
-  aTimers.push(chordTimer);
-
-  /* fade-in general, volumen discreto */
-  aMaster.gain.setTargetAtTime(0.5, ctx.currentTime+0.2, 3.5);
-}
-function musicStop(){
-  if(!actx) return;
-  var ctx=actx;
-  try{ if(aMaster) aMaster.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.5); }catch(e){}
-  aTimers.forEach(function(t){ clearInterval(t); }); aTimers=[];
-  actx=null; aMaster=null; aNodes=[]; padOscs=[]; seqTimer=null;
-  setTimeout(function(){ try{ ctx.close(); }catch(e){} }, 900);
-}
-function setMusic(on){
-  musicOn=on; safeSet(MUSIC_KEY, on?"1":"0");
-  var b=$("musicBtn"); if(b){ b.classList.toggle("on",on); b.textContent=on?"🎵 Música ON":"🎵 Música"; }
-  if(on){ musicStart(); if(actx && actx.state==="suspended") actx.resume(); }
-  else musicStop();
-}
-function toggleMusic(){ setMusic(!musicOn); }
-
-/* Autoplay robusto: intenta arrancar; si el navegador lo bloquea (lo normal),
-   deja todo listo y arranca con el PRIMER gesto del usuario en cualquier lado. */
-function initMusic(){
-  var b=$("musicBtn"); if(b) b.addEventListener("click", toggleMusic);
-  var pref=safeGet(MUSIC_KEY);
-  var want = pref===null ? true : pref==="1";   /* por defecto: intenta sonar sola */
-  if(!want){ setMusic(false); return; }
-  setMusic(true);
-  /* si quedó suspendido por política de autoplay, enganchar el primer gesto */
-  var unlock=function(){
-    if(actx && actx.state==="suspended") actx.resume();
-    else if(!actx && musicOn) musicStart();
-    if(actx && actx.state!=="running") return;   /* seguir esperando si aún no corre */
-    document.removeEventListener("pointerdown",unlock);
-    document.removeEventListener("keydown",unlock);
-    document.removeEventListener("touchstart",unlock);
-  };
-  document.addEventListener("pointerdown",unlock);
-  document.addEventListener("keydown",unlock);
-  document.addEventListener("touchstart",unlock);
-}
 
 /* ===== Tarjetas iniciales ===== */
 function buildCards(){
@@ -1811,6 +1914,21 @@ $("userBtn").addEventListener("click", openUserPick);
   });
 })();
 
+/* Pestañas de días + acciones del panel de alerta de inactividad */
+(function(){
+  var days=$("alertDays");
+  if(days){
+    days.querySelectorAll(".suep-tab").forEach(function(b){
+      b.addEventListener("click", function(){
+        days.querySelectorAll(".suep-tab").forEach(function(x){ x.classList.remove("on"); });
+        b.classList.add("on"); alertDays=parseInt(b.getAttribute("data-days"),10)||7; renderSuepAlert();
+      });
+    });
+  }
+  var wa=$("alertWaBtn");   if(wa) wa.addEventListener("click", difundirAlerta);
+  var cp=$("alertCopyBtn"); if(cp) cp.addEventListener("click", copiarAlerta);
+})();
+
 /* ===== Arranque: el primer escaneo es profundo (detecta columnas y valida todo) ===== */
 buildCards();
 renderIncidents();
@@ -1818,7 +1936,6 @@ if(getUser()){ showGreeting(); } else { openUserPick(); }
 typeLine("Iniciando núcleo de monitoreo…");
 fetchWeather();
 setInterval(fetchWeather, 15*60000);   /* tiempo cada 15 min */
-initMusic();
 startSuepTimers();
 startAutoScan();
 scanAll(true);
@@ -1865,4 +1982,3 @@ scanAll(true);
 </script>
 </body>
 </html>
-
