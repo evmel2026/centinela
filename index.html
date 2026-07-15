@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es-AR">
 <head>
@@ -316,15 +317,7 @@
   .alert-row .u-av{background:rgba(255,138,74,.14);color:var(--warn)}
   .alert-row .u-av.adm{background:rgba(255,138,74,.2)}
   .alert-days-badge{font-family:var(--mono);font-size:12px;color:var(--warn);font-weight:700;white-space:nowrap}
-  .alert-days-badge.warn{color:var(--lime)}
   .alert-days-badge .lbl{display:block;font-size:9px;color:var(--ink-faint);font-weight:400;letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
-  .alert-group-head{grid-column:1/-1;font-family:var(--disp);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;padding:12px 0 5px;display:flex;align-items:center;gap:7px}
-  .alert-group-head:first-child{padding-top:2px}
-  .alert-group-head::before{content:"";width:7px;height:7px;border-radius:50%;flex:none}
-  .alert-group-head.crit{color:var(--warn)} .alert-group-head.crit::before{background:var(--warn)}
-  .alert-group-head.warn{color:var(--lime)} .alert-group-head.warn::before{background:var(--lime)}
-  .alert-row.esp .u-av{background:rgba(200,241,53,.12);color:var(--lime)}
-  .alert-row.esp .u-av.adm{background:rgba(200,241,53,.18)}
   .alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
   .alert-empty-ok{padding:18px 0;text-align:center;color:var(--lime);font-size:12.5px;font-family:var(--mono)}
   @media(max-width:760px){
@@ -511,9 +504,9 @@
     </div>
 
     <div class="suep-alert">
-      <h4>🚨 Control de actividad <span class="cnt" id="suepAlertCnt"></span></h4>
+      <h4>🚨 Alerta de inactividad <span class="cnt" id="suepAlertCnt"></span></h4>
       <div class="alert-controls">
-        <span class="alert-lbl">Ventana de control</span>
+        <span class="alert-lbl">Avisar si no ingresan hace</span>
         <div class="alert-days" id="alertDays">
           <button class="suep-tab" data-days="5">5 días</button>
           <button class="suep-tab on" data-days="7">7 días</button>
@@ -1511,16 +1504,12 @@ function renderSuepActivity(){
   }).join("");
 }
 /* ===== Alerta de inactividad: personal que no ingresa hace N días =====
-   Detección minuciosa: por cada usuario consolidamos TODOS sus ingresos,
-   no solo el último, y lo clasificamos en un nivel de severidad:
-     · "sin_registro" → nunca ingresó (no tiene ningún acceso con fecha)
-     · "inactivo"     → su último ingreso fue hace ≥ N días
-     · "esporadico"   → entró dentro de la ventana, pero muy poco
-                        (1 solo ingreso en los últimos N días → "entra de paso")
-   El nivel esporádico se muestra aparte como aviso preventivo. */
+   Detección minuciosa: por cada usuario consolidamos TODOS sus ingresos
+   (no solo el último) y lo marcamos inactivo si su último ingreso fue hace
+   ≥ N días, o si nunca registró un ingreso. Un usuario conectado AHORA
+   nunca se marca inactivo, aunque su fila más reciente sea vieja. */
 var alertDays=7;              /* umbral activo (días sin ingresar) */
-var lastInactivos=[];         /* inactivos duros, para el WhatsApp */
-var lastEsporadicos=[];       /* entran de paso, aviso preventivo */
+var lastInactivos=[];         /* último cálculo, para armar el mensaje de WhatsApp */
 
 /* Consolida por usuario: último acceso, total histórico y total en la ventana */
 function suepConsolidar(days){
@@ -1541,7 +1530,7 @@ function suepConsolidar(days){
   return map;
 }
 
-/* Inactivos duros: último ingreso hace ≥ N días (o sin registro alguno).
+/* Inactivos: último ingreso hace ≥ N días (o sin registro alguno).
    Un usuario conectado AHORA nunca se marca inactivo aunque su fila sea vieja. */
 function suepInactivos(days){
   if(!suepAccesos) return [];
@@ -1555,20 +1544,6 @@ function suepInactivos(days){
     .sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });  /* el más inactivo primero */
 }
 
-/* Esporádicos: entraron dentro de la ventana pero un único ingreso → "de paso" */
-function suepEsporadicos(days){
-  if(!suepAccesos) return [];
-  var now=Date.now(), umbral=days*86400000;
-  var map=suepConsolidar(days);
-  return Object.keys(map).map(function(k){ return map[k]; })
-    .filter(function(a){
-      if((a.entradaTs||0)===0) return false;
-      if((now-(a.entradaTs||0))>=umbral) return false;   /* ese ya es inactivo */
-      return a.totalWin<=1;                              /* un solo ingreso en la ventana */
-    })
-    .sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });
-}
-
 function diasSin(a){ var now=Date.now(); var ts=a.entradaTs||0; return ts?Math.floor((now-ts)/86400000):null; }
 
 function renderSuepAlert(){
@@ -1579,59 +1554,33 @@ function renderSuepAlert(){
     $("suepAlertCnt").textContent=""; if(actions) actions.style.display="none"; lastInactivos=[]; return;
   }
   var arr=suepInactivos(alertDays);
-  var esp=suepEsporadicos(alertDays);
   lastInactivos=arr;
-  lastEsporadicos=esp;
-  var totalAvisos=arr.length+esp.length;
-  $("suepAlertCnt").textContent=totalAvisos+(totalAvisos===1?" aviso":" avisos");
-  if(!arr.length && !esp.length){
-    box.innerHTML='<div class="alert-empty-ok">✓ Todo el personal ingresó y participó dentro de los últimos '+alertDays+' días.</div>';
+  $("suepAlertCnt").textContent=arr.length+(arr.length===1?" persona":" personas");
+  if(!arr.length){
+    box.innerHTML='<div class="alert-empty-ok">✓ Todo el personal ingresó dentro de los últimos '+alertDays+' días.</div>';
     if(actions) actions.style.display="none"; return;
   }
-  var html="";
-
-  if(arr.length){
-    html+='<div class="alert-group-head crit">Sin ingresar hace '+alertDays+' días o más · '+arr.length+'</div>';
-    html+=arr.slice(0,80).map(function(a){
-      var avc=isAdminRol(a.rol)?"adm":"";
-      var d=diasSin(a);
-      var fecha=(a.entrada||"").split(", ")[0]||"";
-      var badge=(d===null)
-        ? '<div class="alert-days-badge">—<span class="lbl">nunca ingresó</span></div>'
-        : '<div class="alert-days-badge">'+d+'<span class="lbl">días sin ingresar</span></div>';
-      return '<div class="alert-row">'+
-        '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
-        '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
-          '<div class="u-sub">'+esc(a.rol||"Sin rol")+'</div>'+
-          '<div class="u-sub">último ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
-        '<div class="u-right">'+badge+'</div>'+
-        '</div>';
-    }).join("");
-  }
-
-  if(esp.length){
-    html+='<div class="alert-group-head warn">Entran de paso · un solo ingreso en '+alertDays+' días · '+esp.length+'</div>';
-    html+=esp.slice(0,80).map(function(a){
-      var avc=isAdminRol(a.rol)?"adm":"";
-      var d=diasSin(a);
-      var fecha=(a.entrada||"").split(", ")[0]||"";
-      return '<div class="alert-row esp">'+
-        '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
-        '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
-          '<div class="u-sub">'+esc(a.rol||"Sin rol")+'</div>'+
-          '<div class="u-sub">único ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
-        '<div class="u-right"><div class="alert-days-badge warn">'+(d===null?"—":d)+'<span class="lbl">días · 1 ingreso</span></div></div>'+
-        '</div>';
-    }).join("");
-  }
-
-  box.innerHTML=html;
+  box.innerHTML=arr.slice(0,80).map(function(a){
+    var avc=isAdminRol(a.rol)?"adm":"";
+    var d=diasSin(a);
+    var fecha=(a.entrada||"").split(", ")[0]||"";
+    var badge=(d===null)
+      ? '<div class="alert-days-badge">—<span class="lbl">nunca ingresó</span></div>'
+      : '<div class="alert-days-badge">'+d+'<span class="lbl">días sin ingresar</span></div>';
+    return '<div class="alert-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(a.rol||"Sin rol")+'</div>'+
+        '<div class="u-sub">último ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
+      '<div class="u-right">'+badge+'</div>'+
+      '</div>';
+  }).join("");
   if(actions) actions.style.display="flex";
 }
 
 /* Arma el texto de la alerta para difundir por WhatsApp */
 function buildAlertMessage(){
-  if(!lastInactivos.length && !lastEsporadicos.length) return "";
+  if(!lastInactivos.length) return "";
   var now=new Date();
   var hoy=now.toLocaleDateString("es-AR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
   var hora=now.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
@@ -1640,35 +1589,18 @@ function buildAlertMessage(){
   L.push("Secretaría Académica · DCFyCCCO");
   L.push("📅 "+hoy+" · "+hora+" hs");
   L.push("━━━━━━━━━━━━━━━━━━");
-
-  if(lastInactivos.length){
-    L.push("");
-    L.push("⛔ *SIN INGRESAR HACE "+alertDays+" DÍAS O MÁS*");
-    L.push("_Personal que no registra actividad en el sistema:_");
-    L.push("");
-    lastInactivos.forEach(function(a,i){
-      var fecha=(a.entrada||"").split(", ")[0]||"sin registro previo";
-      var d=diasSin(a);
-      var linea=(d===null)
-        ? "   ⚠️ Nunca ingresó al sistema"
-        : "   ⏳ "+d+" días sin ingresar · último: "+fecha;
-      L.push("*"+(i+1)+". "+a.nombre+"*  ("+(a.rol||"Sin rol")+")");
-      L.push(linea);
-    });
-  }
-
-  if(lastEsporadicos.length){
-    L.push("");
-    L.push("🟡 *INGRESO ESPORÁDICO*");
-    L.push("_Ingresaron una sola vez en los últimos "+alertDays+" días:_");
-    L.push("");
-    lastEsporadicos.forEach(function(a,i){
-      var fecha=(a.entrada||"").split(", ")[0]||"sin registro";
-      L.push("*"+(i+1)+". "+a.nombre+"*  ("+(a.rol||"Sin rol")+")");
-      L.push("   • Único ingreso: "+fecha);
-    });
-  }
-
+  L.push("");
+  L.push("El siguiente personal *no registra ingresos al sistema hace "+alertDays+" días o más*:");
+  L.push("");
+  lastInactivos.forEach(function(a,i){
+    var fecha=(a.entrada||"").split(", ")[0]||"sin registro previo";
+    var d=diasSin(a);
+    var linea=(d===null)
+      ? "   ⚠️ Nunca ingresó al sistema"
+      : "   ⏳ "+d+" días sin ingresar · último: "+fecha;
+    L.push("*"+(i+1)+". "+a.nombre+"*  ("+(a.rol||"Sin rol")+")");
+    L.push(linea);
+  });
   L.push("");
   L.push("━━━━━━━━━━━━━━━━━━");
   L.push("📌 Se solicita regularizar el ingreso y la carga de novedades a la brevedad.");
