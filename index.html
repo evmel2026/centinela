@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.18.0">
+<meta name="app-version" content="4.19.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1403,10 +1403,14 @@ function fetchSuepAccesos(){
 }
 
 /* Padrón completo de usuarios de SUEP (los 39, hayan entrado o no).
-   SUEP guarda todo en app_data como clave→JSON; probamos los nombres de clave
-   más habituales hasta encontrar la lista. Si tu clave real es otra, agregala
-   al principio de SUEP_PADRON_KEYS. */
-var SUEP_PADRON_KEYS=["suep_usuarios","usuarios","suep_personal","personal","suep_users","users"];
+   SUEP guarda todo en app_data como clave→JSON. Estrategia en dos pasos:
+   1) probar los nombres de clave más habituales (rápido, 1 request);
+   2) si no aparece, descargar TODAS las claves y detectar automáticamente
+      cuál contiene una lista de personas (array de objetos con nombre/rol/dni).
+   Así funciona aunque la clave tenga cualquier nombre. */
+var SUEP_PADRON_KEYS=["suep_usuarios","usuarios","suep_personal","personal","suep_users","users","padron","suep_padron"];
+var SUEP_PADRON_EXCLUDE=["suep_accesos","accesos"];   /* nunca confundir accesos con padrón */
+var suepPadronKey=null;   /* clave detectada, se cachea para no re-escanear toda la tabla */
 function extractUsuarios(val){
   if(typeof val==="string"){ try{ val=JSON.parse(val); }catch(e){ return []; } }
   if(Array.isArray(val)) return val;
@@ -1421,27 +1425,71 @@ function extractUsuarios(val){
   }
   return [];
 }
+/* Puntúa cuán "padrón de personas" parece una lista. 0 = no lo es. */
+function scorePadron(arr){
+  if(!Array.isArray(arr) || arr.length<3) return 0;
+  var muestra=arr.slice(0,10), hits=0;
+  muestra.forEach(function(o){
+    if(o && typeof o==="object"){
+      var tieneNombre=("nombre" in o)||("apellido" in o)||("nombreCompleto" in o);
+      var tieneId=("usuario" in o)||("dni" in o)||("legajo" in o);
+      var tieneRol=("rol" in o)||("cargo" in o);
+      if(tieneNombre && (tieneId||tieneRol)) hits++;
+    }
+  });
+  return hits/muestra.length;   /* proporción de filas que parecen personas */
+}
 function fetchSuepPadron(){
   var app=getSuepApp(); if(!app) return Promise.resolve(null);
   var base=app.url.replace(/\/+$/,"");
-  /* pide todas las claves candidatas de una con un solo request */
+  var H=hdrs(app);
+  /* Atajo: si ya detectamos la clave antes, vamos directo a ella (ahorra egress) */
+  if(suepPadronKey){
+    var qc="app_data?key=eq."+encodeURIComponent(suepPadronKey)+"&select=value&limit=1";
+    return fetch(base+"/rest/v1/"+qc, { headers:H }).then(function(rc){
+      return rc.text().then(function(tc){
+        if(!rc.ok) throw httpError(rc, tc);
+        var rows=JSON.parse(tc);
+        return rows.length?extractUsuarios(rows[0].value):[];
+      });
+    }).catch(function(){ return null; });
+  }
+  /* Paso 1: claves conocidas */
   var inList=SUEP_PADRON_KEYS.map(function(k){ return '"'+k+'"'; }).join(",");
-  var q="app_data?key=in.("+encodeURIComponent(inList)+")&select=key,value";
-  return fetch(base+"/rest/v1/"+q, { headers:hdrs(app) }).then(function(res){
+  var q1="app_data?key=in.("+encodeURIComponent(inList)+")&select=key,value";
+  return fetch(base+"/rest/v1/"+q1, { headers:H }).then(function(res){
     return res.text().then(function(txt){
-      if(!res.ok) throw httpError(res, txt);
-      var rows=JSON.parse(txt);
-      if(!rows.length) return [];
-      /* respeta el orden de preferencia de SUEP_PADRON_KEYS */
-      for(var i=0;i<SUEP_PADRON_KEYS.length;i++){
-        for(var j=0;j<rows.length;j++){
-          if(rows[j].key===SUEP_PADRON_KEYS[i]){
-            var u=extractUsuarios(rows[j].value);
-            if(u.length) return u;
+      if(res.ok){
+        var rows=JSON.parse(txt);
+        for(var i=0;i<SUEP_PADRON_KEYS.length;i++){
+          for(var j=0;j<rows.length;j++){
+            if(rows[j].key===SUEP_PADRON_KEYS[i]){
+              var u=extractUsuarios(rows[j].value);
+              if(scorePadron(u)>=0.6){ suepPadronKey=rows[j].key; return u; }
+            }
           }
         }
       }
-      return [];
+      /* Paso 2: auto-detección — traer todas las claves y su valor y elegir la mejor */
+      var q2="app_data?select=key,value";
+      return fetch(base+"/rest/v1/"+q2, { headers:H }).then(function(r2){
+        return r2.text().then(function(t2){
+          if(!r2.ok) throw httpError(r2, t2);
+          var all=JSON.parse(t2);
+          var best=null, bestScore=0, bestKey=null;
+          all.forEach(function(row){
+            var k=String(row.key||"").toLowerCase();
+            if(SUEP_PADRON_EXCLUDE.indexOf(k)>=0) return;
+            var u=extractUsuarios(row.value);
+            var sc=scorePadron(u);
+            if(sc>=0.6 && (sc>bestScore || (sc===bestScore && best && u.length>best.length))){
+              best=u; bestScore=sc; bestKey=row.key;
+            }
+          });
+          if(bestKey) suepPadronKey=bestKey;
+          return best||[];
+        });
+      });
     });
   }).catch(function(){ return null; });
 }
@@ -2123,3 +2171,4 @@ scanAll(true);
 </script>
 </body>
 </html>
+
