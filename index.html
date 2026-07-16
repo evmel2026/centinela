@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.15.0">
+<meta name="app-version" content="4.17.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -50,33 +50,34 @@
 
   /* ===== Tema claro ===== */
   [data-theme="light"]{
-    --bg:#eef3fb;
-    --navy-800:#dde6f4;
-    --navy-700:#cdd9ec;
-    --line:rgba(41,74,128,.16);
-    --line-2:rgba(41,74,128,.30);
-    --neon:#0891a6;
-    --lime:#5f8f0a;
-    --lime-soft:#6fa112;
-    --violet:#6a45d9;
-    --magenta:#c02fb0;
-    --gold:#a5720f;
-    --ok:#0f9d63;
-    --warn:#c07a06;
-    --err:#d32f2f;
-    --ink:#16233a;
-    --ink-dim:#3f567a;
-    --ink-faint:#6b81a4;
-    --glass:rgba(255,255,255,.72);
-    --panel-grad:linear-gradient(160deg,rgba(255,255,255,.92),rgba(230,238,250,.9));
-    --btn-bg:rgba(255,255,255,.7);
-    --metric-bg:rgba(255,255,255,.6);
-    --net-bg:rgba(255,255,255,.55);
-    --grid-line:rgba(41,74,128,.06);
-    --aurora-op:.32;
-    --modal-grad:linear-gradient(160deg,#ffffff,#eef3fb);
-    --modal-bar:rgba(245,249,255,.94);
-    --overlay:rgba(20,34,60,.42);
+    --bg:#e7edf7;
+    --navy-800:#d3ddee;
+    --navy-700:#c2d0e6;
+    --line:rgba(30,58,105,.28);
+    --line-2:rgba(30,58,105,.45);
+    --neon:#046b7d;
+    --lime:#4a7a00;
+    --lime-soft:#3d6800;
+    --violet:#5a34c9;
+    --magenta:#a81f98;
+    --gold:#8a5d00;
+    --ok:#087a4a;
+    --warn:#a35c00;
+    --err:#c1121f;
+    --ink:#0b1526;
+    --ink-dim:#2a3d5c;
+    --ink-faint:#4a5e80;
+    --glass:rgba(255,255,255,.85);
+    --panel-grad:linear-gradient(160deg,rgba(255,255,255,.96),rgba(222,232,247,.94));
+    --btn-bg:rgba(255,255,255,.85);
+    --metric-bg:rgba(255,255,255,.78);
+    --net-bg:rgba(255,255,255,.75);
+    --grid-line:rgba(30,58,105,.09);
+    --aurora-op:.42;
+    --neural-op:.55;
+    --modal-grad:linear-gradient(160deg,#ffffff,#e7edf7);
+    --modal-bar:rgba(242,247,254,.96);
+    --overlay:rgba(15,26,48,.5);
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -143,7 +144,7 @@
   @keyframes scanpass{from{transform:translateY(0)}to{transform:translateY(420%)}}
 
   /* ===== Grafo neuronal de fondo (estilo Agentic OS) ===== */
-  .neuralfx{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.9;
+  .neuralfx{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:var(--neural-op,.9);
     -webkit-mask-image:radial-gradient(circle at 50% 45%,#000 0%,#000 45%,transparent 78%);
             mask-image:radial-gradient(circle at 50% 45%,#000 0%,#000 45%,transparent 78%)}
   .neuralfx canvas{width:100%;height:100%;display:block}
@@ -280,7 +281,7 @@
 
   /* ===== Widget del tiempo ===== */
   .weather{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    background:linear-gradient(140deg,rgba(14,26,48,.6),rgba(6,12,24,.6));
+    background:var(--panel-grad);
     border:1px solid var(--line);border-radius:14px;padding:10px 16px;margin-bottom:14px;
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rise .6s both}
   .wx-city{display:flex;align-items:center;gap:10px}
@@ -301,6 +302,35 @@
   .suep-kpi .v{font-family:var(--disp);font-size:26px;font-weight:700;margin-top:4px;line-height:1;text-shadow:0 0 16px rgba(200,241,53,.22)}
   .suep-kpi .v.lime{color:var(--lime)}
   .suep-kpi .h{font-size:10px;color:var(--ink-faint);margin-top:4px}
+
+  /* ===== Ajustes de contraste para modo claro ===== */
+  [data-theme="light"] .stat .v,
+  [data-theme="light"] .suep-kpi .v{text-shadow:none}
+  [data-theme="light"] .stat .v{color:var(--neon)}
+  [data-theme="light"] .stat .k,
+  [data-theme="light"] .suep-kpi .k,
+  [data-theme="light"] .metric .k{color:var(--ink-dim);font-weight:600}
+  [data-theme="light"] .stat .h,
+  [data-theme="light"] .suep-kpi .h,
+  [data-theme="light"] .metric .h,
+  [data-theme="light"] .wx-name,
+  [data-theme="light"] .wx-desc,
+  [data-theme="light"] .wx-meta,
+  [data-theme="light"] .host,
+  [data-theme="light"] .deepnote,
+  [data-theme="light"] .cap{color:var(--ink-faint)}
+  [data-theme="light"] .stat,
+  [data-theme="light"] .suep-kpi,
+  [data-theme="light"] .card,
+  [data-theme="light"] .metric{box-shadow:0 1px 3px rgba(15,26,48,.08),0 6px 20px rgba(15,26,48,.05)}
+  [data-theme="light"] .hero{box-shadow:0 2px 8px rgba(15,26,48,.08),0 12px 40px rgba(15,26,48,.06)}
+  [data-theme="light"] .seclabel{color:var(--gold)}
+  [data-theme="light"] p,
+  [data-theme="light"] .greet,
+  [data-theme="light"] #heroDesc{color:var(--ink-dim)}
+  [data-theme="light"] .greet{color:var(--ink)!important;font-weight:700}
+  [data-theme="light"] .radar .big{text-shadow:none}
+  [data-theme="light"] .hero-state{color:var(--ink)}
 
   .suep-panel{background:var(--glass);border:1px solid var(--line);border-radius:16px;padding:16px 18px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rise .55s both}
   .suep-cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
@@ -1391,8 +1421,10 @@ function suepRankData(sinceMs){
   arr.sort(function(x,y){ return y.count-x.count || y.last-x.last; });
   return arr;
 }
-var SUEP_STALE_MS=30*60000;   /* una sesión activa sin actividad hace +30 min se considera cerrada
-                                 (la mayoría sale sin desloguear; sesión típica ~30 min) */
+var SUEP_STALE_MS=6*60*60000;   /* una sesión activa se considera en línea mientras siga marcada
+                                   activo=true y sea del día de hoy, hasta 6 h desde la entrada
+                                   (cubre una media jornada de trabajo con el panel abierto;
+                                   descarta sesiones colgadas de la madrugada o de días previos) */
 /* orden de prioridad de roles para agrupar */
 var ROL_ORDER=["Administradora","Administrativa","Jefe de Guardia","Instructor","Logístico"];
 function rolRank(rol){ var i=ROL_ORDER.indexOf(rol); return i<0?99:i; }
@@ -1677,8 +1709,8 @@ function refreshSuep(){
         var p=nodes[a], q=nodes[b], ddx=p.x-q.x, ddy=p.y-q.y, dist=Math.sqrt(ddx*ddx+ddy*ddy);
         if(dist<link){
           var lightT=document.documentElement.getAttribute("data-theme")==="light";
-          var al=(1-dist/link)*(lightT?0.28:0.32);
-          ctx.strokeStyle=lightT?("rgba(95,143,10,"+al.toFixed(3)+")"):("rgba(200,241,53,"+al.toFixed(3)+")");
+          var al=(1-dist/link)*(lightT?0.30:0.32);
+          ctx.strokeStyle=lightT?("rgba(74,122,0,"+al.toFixed(3)+")"):("rgba(200,241,53,"+al.toFixed(3)+")");
           ctx.lineWidth=0.6;
           ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
         }
@@ -1691,8 +1723,8 @@ function refreshSuep(){
       ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,Math.PI*2);
       var lightN=document.documentElement.getAttribute("data-theme")==="light";
       if(lightN){
-        ctx.fillStyle=core?("rgba(111,161,18,"+glow.toFixed(3)+")"):("rgba(95,143,10,"+(glow*0.8).toFixed(3)+")");
-        ctx.shadowColor="rgba(95,143,10,.5)";
+        ctx.fillStyle=core?("rgba(74,122,0,"+glow.toFixed(3)+")"):("rgba(61,104,0,"+(glow*0.8).toFixed(3)+")");
+        ctx.shadowColor="rgba(74,122,0,.4)";
       }else{
         ctx.fillStyle=core?("rgba(224,255,140,"+glow.toFixed(3)+")"):("rgba(168,217,42,"+(glow*0.8).toFixed(3)+")");
         ctx.shadowColor="rgba(200,241,53,.7)";
@@ -1851,14 +1883,50 @@ $("userBtn").addEventListener("click", openUserPick);
 
 /* ===== Tema claro / oscuro ===== */
 var THEME_KEY = "centinela.theme";
+
+/* ===== Acento rotativo semanal =====
+   Cada 7 días CENTINELA estrena un color de acento. Es determinístico: vos y
+   Eliana ven el mismo color la misma semana. Cada paleta trae su tono para
+   modo oscuro y otro más saturado para modo claro. */
+var WEEKLY_ACCENTS=[
+  { nombre:"Cian",    dark:"#2de2ea", light:"#046b7d" },
+  { nombre:"Violeta", dark:"#8a63ff", light:"#5a34c9" },
+  { nombre:"Dorado",  dark:"#d8a94a", light:"#8a5d00" },
+  { nombre:"Verde",   dark:"#3fe08d", light:"#087a4a" },
+  { nombre:"Magenta", dark:"#e05cff", light:"#a81f98" },
+  { nombre:"Coral",   dark:"#ff8a5c", light:"#c1481f" }
+];
+function currentWeekIndex(){
+  /* semanas completas transcurridas desde el epoch, con offset para que la
+     rotación no cambie a mitad de semana laboral */
+  var week=Math.floor(Date.now()/604800000);
+  return ((week%WEEKLY_ACCENTS.length)+WEEKLY_ACCENTS.length)%WEEKLY_ACCENTS.length;
+}
+function applyWeeklyAccent(){
+  var light=document.documentElement.getAttribute("data-theme")==="light";
+  var ac=WEEKLY_ACCENTS[currentWeekIndex()];
+  document.documentElement.style.setProperty("--neon", light?ac.light:ac.dark);
+  return ac;
+}
+
 function applyTheme(t){
   var light = (t==="light");
   document.documentElement.setAttribute("data-theme", light?"light":"dark");
   var tb=$("themeBtn"); if(tb){ tb.textContent = light?"☀️":"🌙"; tb.title = light?"Cambiar a modo oscuro":"Cambiar a modo claro"; }
-  var meta=document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute("content", light?"#eef3fb":"#04070f");
+  var meta=document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute("content", light?"#e7edf7":"#04070f");
+  applyWeeklyAccent();
 }
 function getTheme(){ var t=safeGet(THEME_KEY); return t==="light"?"light":"dark"; }
 applyTheme(getTheme());
+/* aviso del acento de la semana, una sola vez por semana */
+(function(){
+  var wk=String(currentWeekIndex())+"-"+Math.floor(Date.now()/604800000);
+  if(safeGet("centinela.accentWeek")!==wk){
+    var ac=WEEKLY_ACCENTS[currentWeekIndex()];
+    setTimeout(function(){ toast("Acento de la semana: "+ac.nombre+" 🎨"); }, 1400);
+    safeSet("centinela.accentWeek", wk);
+  }
+})();
 $("themeBtn").addEventListener("click", function(){
   var next = getTheme()==="light" ? "dark" : "light";
   safeSet(THEME_KEY, next);
