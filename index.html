@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.19.0">
+<meta name="app-version" content="4.19.1">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1691,18 +1691,44 @@ function suepInactivos(days){
 }
 function diasSin(a){ var now=Date.now(); return Math.floor((now-(a.entradaTs||0))/86400000); }
 
-/* Normaliza una clave de identidad para cruzar padrón vs accesos */
-function idKey(u){
-  return String(u.usuario || u.dni || u.nombre || "").trim().toLowerCase();
+/* Normaliza texto para comparar: minúsculas, sin tildes, sin espacios de más */
+function normTxt(s){
+  return String(s||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   /* saca tildes */
+    .toLowerCase().replace(/\s+/g," ").trim();
+}
+/* Clave de nombre insensible al orden: "María Quintana" == "Quintana, María" */
+function nameKey(u){
+  var full=normTxt((u.nombre||u.nombreCompleto||"")+" "+(u.apellido||""))
+    .replace(/,/g," ").replace(/\s+/g," ").trim();
+  if(!full) return "";
+  return full.split(" ").sort().join(" ");   /* ordena las palabras alfabéticamente */
+}
+/* Devuelve TODOS los identificadores posibles de una persona (para cruzar por cualquiera) */
+function idKeys(u){
+  var ks=[];
+  if(u.usuario) ks.push("u:"+normTxt(u.usuario));
+  if(u.dni)     ks.push("d:"+normTxt(u.dni));
+  if(u.legajo)  ks.push("l:"+normTxt(u.legajo));
+  var nk=nameKey(u); if(nk) ks.push("n:"+nk);
+  return ks;
 }
 /* Usuarios del padrón que NUNCA registraron un ingreso.
-   Devuelve [] si SUEP no expone el padrón (no podemos saber quién falta). */
+   Cruza por CUALQUIER identificador coincidente (usuario, dni, legajo o nombre
+   normalizado) para no marcar como ausente a alguien que sí entró pero figura
+   con otro campo. Devuelve null si SUEP no expone el padrón. */
 function suepNuncaIngreso(){
   if(!suepPadron || !suepPadron.length) return null;   /* null = sin padrón disponible */
-  var conAcceso={};
-  (suepAccesos||[]).forEach(function(a){ conAcceso[idKey(a)]=true; });
-  return suepPadron.filter(function(u){ return !conAcceso[idKey(u)]; })
-    .sort(function(x,y){ return String(x.nombre||"").localeCompare(String(y.nombre||"")); });
+  var ingresaron={};
+  (suepAccesos||[]).forEach(function(a){
+    idKeys(a).forEach(function(k){ ingresaron[k]=true; });
+  });
+  return suepPadron.filter(function(u){
+    /* si CUALQUIERA de sus identificadores aparece en accesos, sí ingresó */
+    var ks=idKeys(u);
+    for(var i=0;i<ks.length;i++){ if(ingresaron[ks[i]]) return false; }
+    return true;
+  }).sort(function(x,y){ return String(x.nombre||"").localeCompare(String(y.nombre||"")); });
 }
 
 function renderSuepAlert(){
