@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.17.0">
+<meta name="app-version" content="4.18.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -388,6 +388,7 @@
   .alert-row .u-av.adm{background:rgba(255,138,74,.2)}
   .alert-days-badge{font-family:var(--mono);font-size:12px;color:var(--warn);font-weight:700;white-space:nowrap}
   .alert-days-badge .lbl{display:block;font-size:9px;color:var(--ink-faint);font-weight:400;letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
+  .alert-days-badge.never{color:var(--err)}
   .alert-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
   .alert-empty-ok{padding:18px 0;text-align:center;color:var(--lime);font-size:12.5px;font-family:var(--mono)}
   @media(max-width:760px){
@@ -583,6 +584,7 @@
           <button class="suep-tab on" data-days="7">7 días</button>
           <button class="suep-tab" data-days="10">10 días</button>
           <button class="suep-tab" data-days="15">15 días</button>
+          <button class="suep-tab" data-days="never">Nunca ingresó</button>
         </div>
       </div>
       <div class="u-list" id="suepAlert"><div class="u-empty">Escaneá para detectar personal inactivo.</div></div>
@@ -1376,6 +1378,7 @@ function exportReport(){
 /* ===== Panel SUEP: usuarios y accesos ===== */
 var SUEP_KEY="suep";
 var suepAccesos=null;        /* array de accesos crudos */
+var suepPadron=null;         /* padrón completo de usuarios (los 39), si SUEP lo expone */
 var suepRange="today";       /* rango activo del ranking */
 
 function getSuepApp(){
@@ -1395,6 +1398,50 @@ function fetchSuepAccesos(){
       var val=rows[0].value;
       if(typeof val==="string"){ try{ val=JSON.parse(val); }catch(e){ return []; } }
       return Array.isArray(val)?val:[];
+    });
+  }).catch(function(){ return null; });
+}
+
+/* Padrón completo de usuarios de SUEP (los 39, hayan entrado o no).
+   SUEP guarda todo en app_data como clave→JSON; probamos los nombres de clave
+   más habituales hasta encontrar la lista. Si tu clave real es otra, agregala
+   al principio de SUEP_PADRON_KEYS. */
+var SUEP_PADRON_KEYS=["suep_usuarios","usuarios","suep_personal","personal","suep_users","users"];
+function extractUsuarios(val){
+  if(typeof val==="string"){ try{ val=JSON.parse(val); }catch(e){ return []; } }
+  if(Array.isArray(val)) return val;
+  /* a veces viene como objeto {usuarios:[...]} o {lista:[...]} */
+  if(val && typeof val==="object"){
+    if(Array.isArray(val.usuarios)) return val.usuarios;
+    if(Array.isArray(val.lista)) return val.lista;
+    if(Array.isArray(val.personal)) return val.personal;
+    /* objeto-diccionario {clave:{...}} → tomamos los valores */
+    var vals=Object.keys(val).map(function(k){ return val[k]; });
+    if(vals.length && typeof vals[0]==="object") return vals;
+  }
+  return [];
+}
+function fetchSuepPadron(){
+  var app=getSuepApp(); if(!app) return Promise.resolve(null);
+  var base=app.url.replace(/\/+$/,"");
+  /* pide todas las claves candidatas de una con un solo request */
+  var inList=SUEP_PADRON_KEYS.map(function(k){ return '"'+k+'"'; }).join(",");
+  var q="app_data?key=in.("+encodeURIComponent(inList)+")&select=key,value";
+  return fetch(base+"/rest/v1/"+q, { headers:hdrs(app) }).then(function(res){
+    return res.text().then(function(txt){
+      if(!res.ok) throw httpError(res, txt);
+      var rows=JSON.parse(txt);
+      if(!rows.length) return [];
+      /* respeta el orden de preferencia de SUEP_PADRON_KEYS */
+      for(var i=0;i<SUEP_PADRON_KEYS.length;i++){
+        for(var j=0;j<rows.length;j++){
+          if(rows[j].key===SUEP_PADRON_KEYS[i]){
+            var u=extractUsuarios(rows[j].value);
+            if(u.length) return u;
+          }
+        }
+      }
+      return [];
     });
   }).catch(function(){ return null; });
 }
@@ -1596,6 +1643,20 @@ function suepInactivos(days){
 }
 function diasSin(a){ var now=Date.now(); return Math.floor((now-(a.entradaTs||0))/86400000); }
 
+/* Normaliza una clave de identidad para cruzar padrón vs accesos */
+function idKey(u){
+  return String(u.usuario || u.dni || u.nombre || "").trim().toLowerCase();
+}
+/* Usuarios del padrón que NUNCA registraron un ingreso.
+   Devuelve [] si SUEP no expone el padrón (no podemos saber quién falta). */
+function suepNuncaIngreso(){
+  if(!suepPadron || !suepPadron.length) return null;   /* null = sin padrón disponible */
+  var conAcceso={};
+  (suepAccesos||[]).forEach(function(a){ conAcceso[idKey(a)]=true; });
+  return suepPadron.filter(function(u){ return !conAcceso[idKey(u)]; })
+    .sort(function(x,y){ return String(x.nombre||"").localeCompare(String(y.nombre||"")); });
+}
+
 function renderSuepAlert(){
   var box=$("suepAlert"); if(!box) return;
   var actions=$("alertActions");
@@ -1603,6 +1664,36 @@ function renderSuepAlert(){
     box.innerHTML='<div class="suep-off">SUEP no respondió.</div>';
     $("suepAlertCnt").textContent=""; if(actions) actions.style.display="none"; lastInactivos=[]; return;
   }
+
+  /* ---- Modo "nunca ingresó" ---- */
+  if(alertDays==="never"){
+    var nunca=suepNuncaIngreso();
+    if(nunca===null){
+      /* SUEP no expone el padrón: no podemos saber quién nunca entró */
+      box.innerHTML='<div class="alert-empty-ok" style="color:var(--warn)">Para detectar a quienes nunca ingresaron, CENTINELA necesita leer la lista de usuarios de SUEP y todavía no la encontró. Avisá para configurar la clave del padrón.</div>';
+      $("suepAlertCnt").textContent=""; if(actions) actions.style.display="none"; lastInactivos=[]; return;
+    }
+    lastInactivos=nunca;
+    $("suepAlertCnt").textContent=nunca.length+(nunca.length===1?" persona":" personas");
+    if(!nunca.length){
+      box.innerHTML='<div class="alert-empty-ok">✓ Todos los usuarios del padrón registraron al menos un ingreso.</div>';
+      if(actions) actions.style.display="none"; return;
+    }
+    box.innerHTML=nunca.slice(0,80).map(function(u){
+      var avc=isAdminRol(u.rol)?"adm":"";
+      return '<div class="alert-row">'+
+        '<div class="u-av '+avc+'">'+esc(suepInitials(u.nombre))+'</div>'+
+        '<div class="u-main"><div class="u-name">'+esc(u.nombre||u.usuario||"—")+'</div>'+
+          '<div class="u-sub">'+esc(u.rol||"Sin rol")+'</div>'+
+          '<div class="u-sub">nunca registró un ingreso</div></div>'+
+        '<div class="u-right"><div class="alert-days-badge never">0<span class="lbl">ingresos</span></div></div>'+
+        '</div>';
+    }).join("");
+    if(actions) actions.style.display="flex";
+    return;
+  }
+
+  /* ---- Modo por días (5/7/10/15) ---- */
   var arr=suepInactivos(alertDays);
   lastInactivos=arr;
   $("suepAlertCnt").textContent=arr.length+(arr.length===1?" persona":" personas");
@@ -1629,20 +1720,32 @@ function renderSuepAlert(){
 function buildAlertMessage(){
   if(!lastInactivos.length) return "";
   var hoy=new Date().toLocaleDateString("es-AR",{day:"2-digit",month:"long",year:"numeric"});
+  var esNunca=(alertDays==="never");
   var L=[];
   L.push("🚨 *SUEP · ALERTA DE ACTIVIDAD*");
   L.push("Secretaría Académica DCFyCCCO");
   L.push("Fecha: "+hoy);
   L.push("");
-  L.push("El siguiente personal *no registra ingresos al sistema hace "+alertDays+" días o más*:");
-  L.push("");
-  lastInactivos.forEach(function(a,i){
-    var fecha=(a.entrada||"").split(", ")[0]||"sin registro";
-    L.push((i+1)+". *"+a.nombre+"* — "+(a.rol||"Sin rol"));
-    L.push("   • "+diasSin(a)+" días sin ingresar (último: "+fecha+")");
-  });
-  L.push("");
-  L.push("Se solicita regularizar el acceso y la carga de novedades a la brevedad.");
+  if(esNunca){
+    L.push("El siguiente personal *nunca registró un ingreso al sistema*:");
+    L.push("");
+    lastInactivos.forEach(function(u,i){
+      L.push((i+1)+". *"+(u.nombre||u.usuario||"—")+"* — "+(u.rol||"Sin rol"));
+      L.push("   • sin ingresos registrados");
+    });
+    L.push("");
+    L.push("Se solicita realizar el primer acceso y la carga de novedades a la brevedad.");
+  } else {
+    L.push("El siguiente personal *no registra ingresos al sistema hace "+alertDays+" días o más*:");
+    L.push("");
+    lastInactivos.forEach(function(a,i){
+      var fecha=(a.entrada||"").split(", ")[0]||"sin registro";
+      L.push((i+1)+". *"+a.nombre+"* — "+(a.rol||"Sin rol"));
+      L.push("   • "+diasSin(a)+" días sin ingresar (último: "+fecha+")");
+    });
+    L.push("");
+    L.push("Se solicita regularizar el acceso y la carga de novedades a la brevedad.");
+  }
   L.push("");
   L.push("_Detectado automáticamente por CENTINELA · Centro de Monitoreo_");
   L.push("_Desarrollado por MLF&EV · Secretaría Académica DCFyCCCO_");
@@ -1672,7 +1775,11 @@ function fallbackCopy(text){
 function renderSuepAll(){ renderSuepKPIs(); renderSuepNow(); renderSuepRank(); renderSuepActivity(); renderSuepAlert();
   var c=$("suepClock"); if(c) c.textContent="actualizado "+nowClock(); }
 function refreshSuep(){
-  return fetchSuepAccesos().then(function(list){ suepAccesos=list; renderSuepAll(); });
+  return Promise.all([fetchSuepAccesos(), fetchSuepPadron()]).then(function(r){
+    suepAccesos=r[0];
+    suepPadron=r[1];
+    renderSuepAll();
+  });
 }
 
 /* ===== Grafo neuronal animado del hero (estilo Agentic OS) ===== */
@@ -1894,7 +2001,7 @@ var WEEKLY_ACCENTS=[
   { nombre:"Dorado",  dark:"#d8a94a", light:"#8a5d00" },
   { nombre:"Verde",   dark:"#3fe08d", light:"#087a4a" },
   { nombre:"Magenta", dark:"#e05cff", light:"#a81f98" },
-  { nombre:"Coral",   dark:"#ff8a5c", light:"#c1481f" }
+  { nombre:"Coral",   dark:"#ff8a5c", light:"#ad3f19" }
 ];
 function currentWeekIndex(){
   /* semanas completas transcurridas desde el epoch, con offset para que la
@@ -1952,7 +2059,10 @@ $("themeBtn").addEventListener("click", function(){
     days.querySelectorAll(".suep-tab").forEach(function(b){
       b.addEventListener("click", function(){
         days.querySelectorAll(".suep-tab").forEach(function(x){ x.classList.remove("on"); });
-        b.classList.add("on"); alertDays=parseInt(b.getAttribute("data-days"),10)||7; renderSuepAlert();
+        b.classList.add("on");
+        var dv=b.getAttribute("data-days");
+        alertDays=(dv==="never")?"never":(parseInt(dv,10)||7);
+        renderSuepAlert();
       });
     });
   }
