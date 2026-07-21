@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="4.19.1">
+<meta name="app-version" content="4.20.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -595,6 +595,54 @@
     </div>
   </div>
 
+  <div class="seclabel">Control RODAR · Gestión Vehicular <span id="rodarClock" style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:normal;text-transform:none"></span></div>
+  <div class="suep-hero" id="rodarHero">
+    <div class="suep-kpi"><div class="k">En línea (aprox.)</div><div class="v lime" id="skRConnected">—</div><div class="h">ingreso &lt; 30 min</div></div>
+    <div class="suep-kpi"><div class="k">Ingresos hoy</div><div class="v" id="skRToday">—</div><div class="h">accesos del día</div></div>
+    <div class="suep-kpi"><div class="k">Usuarios (7 días)</div><div class="v" id="skRWeekUsers">—</div><div class="h">personas distintas</div></div>
+    <div class="suep-kpi"><div class="k">Ingresos (7 días)</div><div class="v" id="skRWeek">—</div><div class="h">accesos de la semana</div></div>
+  </div>
+  <div class="suep-panel" id="rodarPanel">
+    <div class="suep-cols">
+      <div class="suep-col">
+        <h4>🟢 Actividad reciente <span class="cnt" id="rodarNowCnt"></span></h4>
+        <div class="u-list" id="rodarNow"><div class="u-empty">Escaneá para ver quién ingresó recién.</div></div>
+      </div>
+      <div class="suep-col">
+        <h4>📊 Ranking de ingresos <span class="cnt" id="rodarRankCnt"></span></h4>
+        <div class="suep-tabs" id="rodarTabs">
+          <button class="suep-tab on" data-range="today">Hoy</button>
+          <button class="suep-tab" data-range="week">7 días</button>
+          <button class="suep-tab" data-range="all">Histórico</button>
+        </div>
+        <div class="u-list" id="rodarRank"><div class="u-empty">Escaneá para ver el ranking.</div></div>
+      </div>
+    </div>
+    <div class="suep-activity">
+      <h4>🕘 Última actividad <span class="cnt" id="rodarActCnt"></span></h4>
+      <div class="u-list" id="rodarActivity"><div class="u-empty">Escaneá para ver la última conexión de cada usuario.</div></div>
+    </div>
+
+    <div class="suep-alert">
+      <h4>🚨 Alerta de inactividad <span class="cnt" id="rodarAlertCnt"></span></h4>
+      <div class="alert-controls">
+        <span class="alert-lbl">Avisar si no ingresan hace</span>
+        <div class="alert-days" id="rodarAlertDaysBox">
+          <button class="suep-tab" data-days="5">5 días</button>
+          <button class="suep-tab on" data-days="7">7 días</button>
+          <button class="suep-tab" data-days="10">10 días</button>
+          <button class="suep-tab" data-days="15">15 días</button>
+          <button class="suep-tab" data-days="never">Nunca ingresó</button>
+        </div>
+      </div>
+      <div class="u-list" id="rodarAlert"><div class="u-empty">Escaneá para detectar personal inactivo.</div></div>
+      <div class="alert-actions" id="rodarAlertActions" style="display:none">
+        <button class="btn primary sm" id="rodarWaBtn" title="Genera el mensaje y abre WhatsApp para difundirlo al grupo">📣 Difundir al grupo por WhatsApp</button>
+        <button class="btn sm" id="rodarCopyBtn" title="Copia el mensaje de alerta al portapapeles">⧉ Copiar mensaje</button>
+      </div>
+    </div>
+  </div>
+
   <div class="seclabel">Aplicaciones</div>
   <div class="grid" id="appGrid"></div>
 
@@ -1177,6 +1225,7 @@ function scanAll(deep){
     if(alerts.length){ notify(alerts); if(cfg.sound) beep(); }
     if(recoveries.length) notify(recoveries);
     refreshSuep();
+    refreshRodar();
   }).catch(function(e){ toast("Error en el escaneo: "+(e.message||e)); typeLine("No pude completar el barrido. Reintento en el próximo ciclo."); })
   .finally(function(){ scanning=false; document.body.classList.remove("scanning"); $("scanBtn").textContent="Escanear ahora"; });
 }
@@ -1856,6 +1905,340 @@ function refreshSuep(){
   });
 }
 
+/* =====================================================================
+   ===============  CONTROL RODAR · usuarios y accesos  ================
+   RODAR guarda TODO en una sola tabla: rodar_registros(id, tipo, datos, actualizado).
+   - Padrón   = filas tipo='usuarios'  → datos:{usuario,apellido,nombre,rol,activo,...}
+   - Ingresos = filas tipo='auditoria' → datos:{accion:'Ingreso',usuario,nombre,rol,fecha}
+   A diferencia de SUEP, RODAR no marca una sesión "activa" ni registra la salida,
+   así que "en línea" se APROXIMA por el último ingreso reciente (< 30 min).
+   ===================================================================== */
+var RODAR_KEY="rodar";
+var rodarAccesos=null;       /* array de ingresos normalizados */
+var rodarPadron=null;        /* padrón de usuarios activos */
+var rodarRange="today";      /* rango activo del ranking */
+var RODAR_ONLINE_MS=30*60000;   /* ventana de "en línea (aprox.)" desde el último ingreso */
+
+var RODAR_ROLE_LABEL={admin:"Administradora",chofer:"Chofer",consulta:"Consulta · Jefes/Oficiales"};
+function rodarRolLabel(r){ return RODAR_ROLE_LABEL[r]||r||"Sin rol"; }
+function rodarRolRank(r){ var o=["admin","chofer","consulta"]; var i=o.indexOf(r); return i<0?99:i; }
+function rodarRolIcon(r){ if(r==="admin")return "👮"; if(r==="chofer")return "🚓"; if(r==="consulta")return "👁️"; return "👤"; }
+function isRodarAdmin(r){ return r==="admin"; }
+
+function getRodarApp(){ for(var i=0;i<cfg.apps.length;i++){ if(cfg.apps[i].key===RODAR_KEY) return cfg.apps[i]; } return null; }
+
+/* Normaliza las filas de auditoría a ingresos {usuario,nombre,rol,entradaTs,entrada} */
+function rodarNormAccesos(rows){
+  var out=[];
+  (rows||[]).forEach(function(x){
+    var d=x.datos||{};
+    if(String(d.accion||"")!=="Ingreso") return;   /* solo ingresos, no cambios/reseteos de clave */
+    var ts=Date.parse(d.fecha||x.actualizado||"")||0;
+    out.push({ usuario:d.usuario||"", nombre:d.nombre||d.usuario||"—", rol:d.rol||"",
+               entradaTs:ts, entrada: ts?new Date(ts).toLocaleString("es-AR"):"" });
+  });
+  return out;
+}
+/* Normaliza las filas de usuarios al padrón {usuario,nombre,apellido,rol,activo} */
+function rodarNormPadron(rows){
+  var out=[];
+  (rows||[]).forEach(function(x){
+    var d=x.datos||{};
+    if(d.activo===false) return;   /* solo quienes pueden ingresar */
+    var nom=((d.apellido||"")+" "+(d.nombre||"")).trim() || d.usuario || "—";
+    out.push({ usuario:d.usuario||"", nombre:nom, apellido:d.apellido||"", rol:d.rol||"", activo:d.activo!==false });
+  });
+  return out;
+}
+function fetchRodarAccesos(){
+  var app=getRodarApp(); if(!app) return Promise.resolve(null);
+  var base=app.url.replace(/\/+$/,"");
+  var q="rodar_registros?tipo=eq.auditoria&select=datos,actualizado&order=actualizado.desc&limit=8000";
+  return fetch(base+"/rest/v1/"+q,{ headers:hdrs(app) }).then(function(res){
+    return res.text().then(function(txt){
+      if(!res.ok) throw httpError(res,txt);
+      return rodarNormAccesos(JSON.parse(txt));
+    });
+  }).catch(function(){ return null; });
+}
+function fetchRodarPadron(){
+  var app=getRodarApp(); if(!app) return Promise.resolve(null);
+  var base=app.url.replace(/\/+$/,"");
+  var q="rodar_registros?tipo=eq.usuarios&select=datos,actualizado&limit=500";
+  return fetch(base+"/rest/v1/"+q,{ headers:hdrs(app) }).then(function(res){
+    return res.text().then(function(txt){
+      if(!res.ok) throw httpError(res,txt);
+      var rows=JSON.parse(txt);
+      /* RODAR puede tener el mismo usuario duplicado en la nube: quedarse con el más reciente */
+      rows.sort(function(a,b){ return String(b.actualizado||"").localeCompare(String(a.actualizado||"")); });
+      var seen={}, keep=[];
+      rows.forEach(function(x){ var u=((x.datos&&x.datos.usuario)||"").toLowerCase();
+        if(u){ if(seen[u]) return; seen[u]=1; } keep.push(x); });
+      return rodarNormPadron(keep);
+    });
+  }).catch(function(){ return null; });
+}
+/* Ingresos por usuario dentro de una ventana (0 = histórico) */
+function rodarRankData(sinceMs){
+  if(!rodarAccesos) return [];
+  var map={};
+  rodarAccesos.forEach(function(a){
+    var ts=a.entradaTs||0; if(sinceMs && ts<sinceMs) return;
+    var key=a.usuario||a.nombre;
+    if(!map[key]) map[key]={nombre:a.nombre,usuario:a.usuario,rol:a.rol,count:0,last:0};
+    map[key].count++; if(ts>map[key].last) map[key].last=ts;
+  });
+  var arr=Object.keys(map).map(function(k){ return map[k]; });
+  arr.sort(function(x,y){ return y.count-x.count || y.last-x.last; });
+  return arr;
+}
+/* "En línea" aproximado: último ingreso de cada usuario dentro de la ventana */
+function rodarOnline(){
+  if(!rodarAccesos) return [];
+  var now=Date.now(), map={};
+  rodarAccesos.forEach(function(a){ var k=a.usuario||a.nombre; if(!map[k]||a.entradaTs>map[k].entradaTs) map[k]=a; });
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .filter(function(a){ return (now-(a.entradaTs||0))<=RODAR_ONLINE_MS; })
+    .sort(function(x,y){ return (y.entradaTs||0)-(x.entradaTs||0); });
+}
+function renderRodarNow(){
+  var box=$("rodarNow"); if(!box) return;
+  if(!rodarAccesos){ box.innerHTML='<div class="suep-off">RODAR no respondió. Reintento en el próximo escaneo.</div>'; $("rodarNowCnt").textContent=""; return; }
+  var now=Date.now();
+  var vivos=rodarOnline();
+  $("rodarNowCnt").textContent=vivos.length+" reciente"+(vivos.length===1?"":"s");
+  var html="";
+  if(!vivos.length){ html='<div class="u-empty">Sin ingresos en los últimos 30 minutos.</div>'; }
+  else{
+    var byRol={};
+    vivos.forEach(function(a){ var r=a.rol||"consulta"; (byRol[r]=byRol[r]||[]).push(a); });
+    var roles=Object.keys(byRol).sort(function(x,y){ return rodarRolRank(x)-rodarRolRank(y); });
+    html+='<div class="rol-breakdown">'+roles.map(function(r){
+      return '<span class="rol-pill">'+rodarRolIcon(r)+' '+esc(rodarRolLabel(r))+' <b>'+byRol[r].length+'</b></span>';
+    }).join("")+'</div>';
+    roles.forEach(function(r){
+      var grupo=byRol[r].slice().sort(function(x,y){ return (y.entradaTs||0)-(x.entradaTs||0); });
+      html+='<div class="rol-group"><div class="rol-head">'+rodarRolIcon(r)+' '+esc(rodarRolLabel(r))+' <span>'+grupo.length+'</span></div>';
+      html+=grupo.map(function(a){
+        var avc=isRodarAdmin(a.rol)?"adm":"on";
+        var hora=(a.entrada||"").split(", ")[1]||a.entrada||"";
+        return '<div class="u-row live-row">'+
+          '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+          '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+            '<div class="u-sub">🕐 ingresó '+esc(hora)+'</div></div>'+
+          '<div class="u-right"><span class="u-live"><span class="dot"></span>ingreso reciente</span>'+
+            '<div class="u-timer" data-ts="'+(a.entradaTs||0)+'">'+fmtDur(now-(a.entradaTs||0))+'</div></div>'+
+          '</div>';
+      }).join("");
+      html+='</div>';
+    });
+  }
+  box.innerHTML=html;
+}
+var rodarTimerInt=null;
+function startRodarTimers(){
+  if(rodarTimerInt) clearInterval(rodarTimerInt);
+  rodarTimerInt=setInterval(function(){
+    if(document.hidden) return;
+    var now=Date.now();
+    document.querySelectorAll("#rodarNow .u-timer").forEach(function(el){
+      var ts=parseInt(el.getAttribute("data-ts"),10)||0;
+      if(ts) el.textContent=fmtDur(now-ts);
+    });
+  }, 1000);
+}
+function renderRodarRank(){
+  var box=$("rodarRank"); if(!box) return;
+  if(!rodarAccesos){ box.innerHTML='<div class="suep-off">RODAR no respondió.</div>'; $("rodarRankCnt").textContent=""; return; }
+  var since = rodarRange==="today"?suepDayStart() : rodarRange==="week"?(Date.now()-7*86400000) : 0;
+  var arr=rodarRankData(since);
+  $("rodarRankCnt").textContent=arr.length+" usuario"+(arr.length===1?"":"s");
+  if(!arr.length){ box.innerHTML='<div class="u-empty">Sin ingresos en este período.</div>'; return; }
+  var max=arr[0].count||1;
+  box.innerHTML=arr.slice(0,40).map(function(u,i){
+    var pct=Math.round((u.count/max)*100);
+    var avc=isRodarAdmin(u.rol)?"adm":"";
+    var ago=u.last?fmtAgo(Date.now()-u.last):"—";
+    return '<div class="u-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(u.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+(i<3?['🥇','🥈','🥉'][i]+' ':'')+esc(u.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(rodarRolLabel(u.rol))+' · último acceso hace '+ago+'</div>'+
+        '<div class="u-bar"><i style="width:'+pct+'%"></i></div></div>'+
+      '<div class="u-right"><div class="u-count">'+u.count+'<span class="lbl">ingreso'+(u.count===1?"":"s")+'</span></div></div>'+
+      '</div>';
+  }).join("");
+}
+function renderRodarKPIs(){
+  if(!rodarAccesos){ ["skRConnected","skRToday","skRWeekUsers","skRWeek"].forEach(function(id){ var e=$(id); if(e)e.textContent="—"; }); return; }
+  var conn=rodarOnline().length;
+  var day=suepDayStart(), wk=Date.now()-7*86400000;
+  var today=0, week=0, wkUsers={};
+  rodarAccesos.forEach(function(a){
+    var ts=a.entradaTs||0;
+    if(ts>=day) today++;
+    if(ts>=wk){ week++; wkUsers[a.usuario||a.nombre]=true; }
+  });
+  tween($("skRConnected"), conn, function(v){ return String(Math.round(v)); });
+  tween($("skRToday"), today, function(v){ return String(Math.round(v)); });
+  tween($("skRWeekUsers"), Object.keys(wkUsers).length, function(v){ return String(Math.round(v)); });
+  tween($("skRWeek"), week, function(v){ return String(Math.round(v)); });
+}
+function renderRodarActivity(){
+  var box=$("rodarActivity"); if(!box) return;
+  if(!rodarAccesos){ box.innerHTML='<div class="suep-off">RODAR no respondió.</div>'; $("rodarActCnt").textContent=""; return; }
+  var now=Date.now();
+  var recientes={};
+  rodarOnline().forEach(function(a){ recientes[a.usuario||a.nombre]=true; });
+  var map={};
+  rodarAccesos.forEach(function(a){ var k=a.usuario||a.nombre, ts=a.entradaTs||0; if(!map[k]||ts>map[k].entradaTs) map[k]=a; });
+  var arr=Object.keys(map).filter(function(k){ return !recientes[k]; })
+    .map(function(k){ return map[k]; })
+    .sort(function(x,y){ return (y.entradaTs||0)-(x.entradaTs||0); });
+  $("rodarActCnt").textContent=arr.length+" usuario"+(arr.length===1?"":"s");
+  if(!arr.length){ box.innerHTML='<div class="u-empty">Sin actividad previa registrada.</div>'; return; }
+  box.innerHTML=arr.slice(0,60).map(function(a){
+    var avc=isRodarAdmin(a.rol)?"adm":"";
+    var ago=a.entradaTs?fmtAgo(now-a.entradaTs):"—";
+    var fecha=(a.entrada||"").split(", ")[0]||"";
+    var hora=(a.entrada||"").split(", ")[1]||"";
+    return '<div class="u-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(rodarRolLabel(a.rol))+' · '+esc(fecha)+' '+esc(hora)+'</div></div>'+
+      '<div class="u-right"><div class="u-ago">hace '+esc(ago)+'</div><div class="u-sub" style="margin-top:2px">último ingreso</div></div>'+
+      '</div>';
+  }).join("");
+}
+var rodarAlertDays=7;
+var rodarLastInactivos=[];
+function rodarInactivos(days){
+  if(!rodarAccesos) return [];
+  var now=Date.now(), umbral=days*86400000, map={};
+  rodarAccesos.forEach(function(a){ var k=a.usuario||a.nombre, ts=a.entradaTs||0; if(!map[k]||ts>map[k].entradaTs) map[k]=a; });
+  return Object.keys(map).map(function(k){ return map[k]; })
+    .filter(function(a){ return (now-(a.entradaTs||0))>=umbral; })
+    .sort(function(x,y){ return (x.entradaTs||0)-(y.entradaTs||0); });
+}
+/* Usuarios del padrón que nunca registraron un ingreso (cruce por usuario/nombre) */
+function rodarNuncaIngreso(){
+  if(!rodarPadron || !rodarPadron.length) return null;
+  var ingresaron={};
+  (rodarAccesos||[]).forEach(function(a){ idKeys(a).forEach(function(k){ ingresaron[k]=true; }); });
+  return rodarPadron.filter(function(u){
+    var ks=idKeys(u);
+    for(var i=0;i<ks.length;i++){ if(ingresaron[ks[i]]) return false; }
+    return true;
+  }).sort(function(x,y){ return String(x.nombre||"").localeCompare(String(y.nombre||"")); });
+}
+function renderRodarAlert(){
+  var box=$("rodarAlert"); if(!box) return;
+  var actions=$("rodarAlertActions");
+  if(!rodarAccesos){
+    box.innerHTML='<div class="suep-off">RODAR no respondió.</div>';
+    $("rodarAlertCnt").textContent=""; if(actions) actions.style.display="none"; rodarLastInactivos=[]; return;
+  }
+  if(rodarAlertDays==="never"){
+    var nunca=rodarNuncaIngreso();
+    if(nunca===null){
+      box.innerHTML='<div class="alert-empty-ok" style="color:var(--warn)">Para detectar a quienes nunca ingresaron, CENTINELA necesita leer el padrón de usuarios de RODAR y todavía no respondió. Reintento en el próximo escaneo.</div>';
+      $("rodarAlertCnt").textContent=""; if(actions) actions.style.display="none"; rodarLastInactivos=[]; return;
+    }
+    rodarLastInactivos=nunca;
+    $("rodarAlertCnt").textContent=nunca.length+(nunca.length===1?" persona":" personas");
+    if(!nunca.length){
+      box.innerHTML='<div class="alert-empty-ok">✓ Todos los usuarios del padrón registraron al menos un ingreso.</div>';
+      if(actions) actions.style.display="none"; return;
+    }
+    box.innerHTML=nunca.slice(0,80).map(function(u){
+      var avc=isRodarAdmin(u.rol)?"adm":"";
+      return '<div class="alert-row">'+
+        '<div class="u-av '+avc+'">'+esc(suepInitials(u.nombre))+'</div>'+
+        '<div class="u-main"><div class="u-name">'+esc(u.nombre||u.usuario||"—")+'</div>'+
+          '<div class="u-sub">'+esc(rodarRolLabel(u.rol))+'</div>'+
+          '<div class="u-sub">nunca registró un ingreso</div></div>'+
+        '<div class="u-right"><div class="alert-days-badge never">0<span class="lbl">ingresos</span></div></div>'+
+        '</div>';
+    }).join("");
+    if(actions) actions.style.display="flex";
+    return;
+  }
+  var arr=rodarInactivos(rodarAlertDays);
+  rodarLastInactivos=arr;
+  $("rodarAlertCnt").textContent=arr.length+(arr.length===1?" persona":" personas");
+  if(!arr.length){
+    box.innerHTML='<div class="alert-empty-ok">✓ Todo el personal ingresó dentro de los últimos '+rodarAlertDays+' días.</div>';
+    if(actions) actions.style.display="none"; return;
+  }
+  box.innerHTML=arr.slice(0,80).map(function(a){
+    var avc=isRodarAdmin(a.rol)?"adm":"";
+    var d=diasSin(a);
+    var fecha=(a.entrada||"").split(", ")[0]||"";
+    return '<div class="alert-row">'+
+      '<div class="u-av '+avc+'">'+esc(suepInitials(a.nombre))+'</div>'+
+      '<div class="u-main"><div class="u-name">'+esc(a.nombre)+'</div>'+
+        '<div class="u-sub">'+esc(rodarRolLabel(a.rol))+'</div>'+
+        '<div class="u-sub">último ingreso: '+esc(fecha||"sin registro")+'</div></div>'+
+      '<div class="u-right"><div class="alert-days-badge">'+d+'<span class="lbl">días sin ingresar</span></div></div>'+
+      '</div>';
+  }).join("");
+  if(actions) actions.style.display="flex";
+}
+function buildRodarAlertMessage(){
+  if(!rodarLastInactivos.length) return "";
+  var hoy=new Date().toLocaleDateString("es-AR",{day:"2-digit",month:"long",year:"numeric"});
+  var esNunca=(rodarAlertDays==="never");
+  var L=[];
+  L.push("🚓 *RODAR · ALERTA DE ACTIVIDAD*");
+  L.push("Secretaría Académica DCFyCCCO");
+  L.push("Fecha: "+hoy);
+  L.push("");
+  if(esNunca){
+    L.push("El siguiente personal *nunca registró un ingreso al sistema*:");
+    L.push("");
+    rodarLastInactivos.forEach(function(u,i){
+      L.push((i+1)+". *"+(u.nombre||u.usuario||"—")+"* — "+rodarRolLabel(u.rol));
+      L.push("   • sin ingresos registrados");
+    });
+    L.push("");
+    L.push("Se solicita realizar el primer acceso y la carga de novedades a la brevedad.");
+  } else {
+    L.push("El siguiente personal *no registra ingresos al sistema hace "+rodarAlertDays+" días o más*:");
+    L.push("");
+    rodarLastInactivos.forEach(function(a,i){
+      var fecha=(a.entrada||"").split(", ")[0]||"sin registro";
+      L.push((i+1)+". *"+a.nombre+"* — "+rodarRolLabel(a.rol));
+      L.push("   • "+diasSin(a)+" días sin ingresar (último: "+fecha+")");
+    });
+    L.push("");
+    L.push("Se solicita regularizar el acceso y la carga de novedades a la brevedad.");
+  }
+  L.push("");
+  L.push("_Detectado automáticamente por CENTINELA · Centro de Monitoreo_");
+  L.push("_Desarrollado por MLF&EV · Secretaría Académica DCFyCCCO_");
+  return L.join("\n");
+}
+function difundirRodarAlerta(){
+  var msg=buildRodarAlertMessage();
+  if(!msg){ toast("No hay personal inactivo para difundir."); return; }
+  window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+}
+function copiarRodarAlerta(){
+  var msg=buildRodarAlertMessage(); if(!msg) return;
+  var done=function(){ var b=$("rodarCopyBtn"); if(b){ var t=b.textContent; b.textContent="✓ Copiado"; setTimeout(function(){ b.textContent=t; },1800); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(done).catch(function(){ fallbackCopy(msg); done(); });
+  } else { fallbackCopy(msg); done(); }
+}
+function renderRodarAll(){ renderRodarKPIs(); renderRodarNow(); renderRodarRank(); renderRodarActivity(); renderRodarAlert();
+  var c=$("rodarClock"); if(c) c.textContent="actualizado "+nowClock(); }
+function refreshRodar(){
+  return Promise.all([fetchRodarAccesos(), fetchRodarPadron()]).then(function(r){
+    rodarAccesos=r[0];
+    rodarPadron=r[1];
+    renderRodarAll();
+  });
+}
+
 /* ===== Grafo neuronal animado del hero (estilo Agentic OS) ===== */
 (function(){
   var cv=$("neuralCanvas"); if(!cv) return;
@@ -2144,6 +2527,35 @@ $("themeBtn").addEventListener("click", function(){
   var cp=$("alertCopyBtn"); if(cp) cp.addEventListener("click", copiarAlerta);
 })();
 
+/* Pestañas del ranking RODAR */
+(function(){
+  var tabs=$("rodarTabs"); if(!tabs) return;
+  tabs.querySelectorAll(".suep-tab").forEach(function(b){
+    b.addEventListener("click", function(){
+      tabs.querySelectorAll(".suep-tab").forEach(function(x){ x.classList.remove("on"); });
+      b.classList.add("on"); rodarRange=b.getAttribute("data-range"); renderRodarRank();
+    });
+  });
+})();
+
+/* Pestañas de días + acciones del panel de alerta de inactividad RODAR */
+(function(){
+  var days=$("rodarAlertDaysBox");
+  if(days){
+    days.querySelectorAll(".suep-tab").forEach(function(b){
+      b.addEventListener("click", function(){
+        days.querySelectorAll(".suep-tab").forEach(function(x){ x.classList.remove("on"); });
+        b.classList.add("on");
+        var dv=b.getAttribute("data-days");
+        rodarAlertDays=(dv==="never")?"never":(parseInt(dv,10)||7);
+        renderRodarAlert();
+      });
+    });
+  }
+  var wa=$("rodarWaBtn");   if(wa) wa.addEventListener("click", difundirRodarAlerta);
+  var cp=$("rodarCopyBtn"); if(cp) cp.addEventListener("click", copiarRodarAlerta);
+})();
+
 /* ===== Arranque: el primer escaneo es profundo (detecta columnas y valida todo) ===== */
 buildCards();
 renderIncidents();
@@ -2152,6 +2564,7 @@ typeLine("Iniciando núcleo de monitoreo…");
 fetchWeather();
 setInterval(fetchWeather, 15*60000);   /* tiempo cada 15 min */
 startSuepTimers();
+startRodarTimers();
 startAutoScan();
 scanAll(true);
 </script>
