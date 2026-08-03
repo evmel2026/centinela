@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="5.2.0">
+<meta name="app-version" content="5.3.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -989,6 +989,32 @@ function pad(n){ return n<10?"0"+n:""+n; }
 function nowClock(){ var d=new Date(); return pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds()); }
 function fmtStamp(t){ var d=new Date(t); return d.toLocaleDateString("es-AR")+" "+pad(d.getHours())+":"+pad(d.getMinutes()); }
 
+/* ===== Fechas =====
+   Nuestras apps guardan la fecha de dos maneras: algunas en formato ISO
+   (2026-08-01T01:57:00Z) y otras como texto argentino ("01/08/2026, 01:57 a. m.").
+   Este lector entiende las dos y evita que CENTINELA marque como error una fecha
+   que en realidad está perfecta. */
+var FECHA_AR = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/;
+function esFechaTexto(v){ return typeof v==="string" && FECHA_AR.test(v.trim()); }
+function parseFecha(v){
+  if(v===null||v===undefined||v==="") return NaN;
+  if(typeof v==="number") return v>1e11? v : v*1000;
+  var s=String(v).trim().replace(/\u00a0/g," ");
+  if(FECHA_AR.test(s)){
+    var m=s.toLowerCase().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?\s*(a\.?\s?m\.?|p\.?\s?m\.?)?/);
+    if(!m) return NaN;
+    var dia=+m[1], mes=+m[2], anio=+m[3];
+    if(anio<100) anio+=2000;
+    var h=m[4]?+m[4]:0, mi=m[5]?+m[5]:0, se=m[6]?+m[6]:0, ap=m[7]||"";
+    if(ap){ if(ap.charAt(0)==="p" && h<12) h+=12; if(ap.charAt(0)==="a" && h===12) h=0; }
+    if(mes<1||mes>12||dia<1||dia>31) return NaN;
+    var dt=new Date(anio, mes-1, dia, h, mi, se);
+    return isNaN(dt.getTime())? NaN : dt.getTime();
+  }
+  var d=new Date(s);
+  return isNaN(d.getTime())? NaN : d.getTime();
+}
+
 /* Animación de números (count-up) */
 function tween(el, to, fmt, dur){
   if(!el) return;
@@ -1235,7 +1261,7 @@ function supaNewest(app, table, tsCol){
 
 /* ===== Analizar una tabla (validación profunda) ===== */
 function analyzeTable(t, rows, total){
-  var issues=[], seen={}, dupes={}, newest=null;
+  var issues=[], seen={}, dupes={}, newest=null, tsText=false;
   var first=rows[0]||null;
   var idCol=pickCol(first, t.idCol, ID_CANDS);
   var tsCol=pickCol(first, t.tsCol, TS_CANDS);
@@ -1251,9 +1277,10 @@ function analyzeTable(t, rows, total){
     if(tsCol){
       var tv=r[tsCol];
       if(tv){
-        var d=new Date(tv);
-        if(isNaN(d.getTime())) issues.push({level:"e",text:"Fecha ilegible en "+tsCol+": \""+tv+"\""});
-        else{ if(d.getTime()>Date.now()+86400000) issues.push({level:"w",text:"Fecha futura en "+tsCol}); if(newest===null||d.getTime()>newest) newest=d.getTime(); }
+        if(esFechaTexto(tv)) tsText=true;
+        var ms=parseFecha(tv);
+        if(isNaN(ms)) issues.push({level:"e",text:"Fecha ilegible en "+tsCol+": \""+tv+"\""});
+        else{ if(ms>Date.now()+86400000) issues.push({level:"w",text:"Fecha futura en "+tsCol}); if(newest===null||ms>newest) newest=ms; }
       }
     }
     if(dataCol){
@@ -1272,7 +1299,7 @@ function analyzeTable(t, rows, total){
 
   var errs=0,warns=0; issues.forEach(function(x){ if(x.level==="e")errs++; else warns++; });
   return { total:total, sample:rows.length, newest:newest, dupes:dupCount, errs:errs, warns:warns, issues:issues,
-           cols:{id:idCol,ts:tsCol,data:dataCol} };
+           tsText:tsText, cols:{id:idCol,ts:tsCol,data:dataCol} };
 }
 
 /* frescura → nivel según umbrales */
@@ -1291,7 +1318,7 @@ function scanTableDeep(app, t){
     var a=analyzeTable(t, res.rows, res.total);
     var fr=freshOf(a.newest, !!a.cols.ts);
     if(!deepCache[app.key]) deepCache[app.key]={};
-    deepCache[app.key][t.table]={ t:Date.now(), errs:a.errs, warns:a.warns, dupes:a.dupes, issues:a.issues, cols:a.cols };
+    deepCache[app.key][t.table]={ t:Date.now(), errs:a.errs, warns:a.warns, dupes:a.dupes, issues:a.issues, cols:a.cols, newest:a.newest, tsText:a.tsText };
     var status="ok";
     if(a.errs>0||fr.freshLevel==="err") status="err"; else if(a.warns>0||fr.freshLevel==="warn") status="warn";
     return { table:t.table, online:true, error:null, mode:"deep", status:status,
@@ -1308,12 +1335,20 @@ function scanTableLight(app, t){
   var t0=performance.now(), egress=0;
   var cache=(deepCache[app.key]||{})[t.table]||null;
   var tsCol=(cache&&cache.cols&&cache.cols.ts)||t.tsCol||null;
-  var newestP = tsCol
-    ? supaNewest(app, t.table, tsCol).then(function(r){ egress+=r.bytes; return r.ts?new Date(r.ts).getTime():null; })
-                                     .catch(function(){ return null; })
-    : Promise.resolve(null);
+  var newestP;
+  if(cache && cache.tsText){
+    /* fecha guardada como texto: ordenarla en el servidor daría cualquier cosa,
+       así que usamos la que calculó el último escaneo profundo */
+    newestP = Promise.resolve(cache.newest!=null?cache.newest:null);
+  } else if(tsCol){
+    newestP = supaNewest(app, t.table, tsCol).then(function(r){ egress+=r.bytes; return r.ts?parseFecha(r.ts):null; })
+                                             .catch(function(){ return null; });
+  } else {
+    newestP = Promise.resolve(null);
+  }
   return Promise.all([ supaCount(app, t.table), newestP ]).then(function(vals){
     var total=vals[0], newest=vals[1];
+    if(newest!=null && isNaN(newest)) newest=null;
     var fr=freshOf(newest, !!tsCol);
     var errs=cache?cache.errs:0, warns=cache?cache.warns:0, dupes=cache?cache.dupes:0, issues=cache?cache.issues:[];
     var status="ok";
@@ -1614,7 +1649,7 @@ function setNet(s){
 function exportReport(){
   if(!lastResults){ toast("Escaneá al menos una vez antes de exportar"); return; }
   var rep={
-    sistema:"CENTINELA v5.2.0 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
+    sistema:"CENTINELA v5.3.0 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
     generado:new Date().toLocaleString("es-AR"),
     apps:lastResults.map(function(R){
       return { app:R.app.name, host:host(R.app.url), estado:R.status, modo:R.mode,
@@ -2992,7 +3027,7 @@ function genRowsStats(g){
   var by={}, u7={};
   g.rows.forEach(function(r){
     var u=String(r[g.userCol]==null?"\u2014":r[g.userCol]);
-    var ts=g.tsCol ? new Date(r[g.tsCol]).getTime() : NaN;
+    var ts=g.tsCol ? parseFecha(r[g.tsCol]) : NaN;
     if(!by[u]) by[u]={ u:u, n:0, last:0, acc:"" };
     by[u].n++;
     if(!isNaN(ts)){
@@ -3110,7 +3145,11 @@ function fetchGenActivity(app){
       var tsCol=genPickCol(first, GEN_TS_CANDS);
       var userCol=app.actUserCol || genPickCol(first, GEN_USER_CANDS);
       var accCol=genPickCol(first, GEN_ACC_CANDS);
-      var q="?select=*&limit=300"+(tsCol?("&order="+encodeURIComponent(tsCol)+".desc.nullslast"):"");
+      var muestra = tsCol ? first[tsCol] : null;
+      var idCol = genPickCol(first, ID_CANDS);
+      var q="?select=*&limit=300";
+      if(tsCol && muestra && !esFechaTexto(muestra)) q+="&order="+encodeURIComponent(tsCol)+".desc.nullslast";
+      else if(idCol) q+="&order="+encodeURIComponent(idCol)+".desc";
       return fetch(base+"/rest/v1/"+t+q, { headers:hdrs(app) }).then(function(r2){
         return r2.text().then(function(tx2){
           if(!r2.ok) throw httpError(r2, tx2);

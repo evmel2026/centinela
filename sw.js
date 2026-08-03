@@ -1,7 +1,7 @@
 /* CENTINELA · service worker
    Cachea el armazón para que la app abra aunque no haya internet.
    Los datos de Supabase NUNCA se cachean: siempre van a la red. */
-var CACHE = "centinela-v5.2.0";
+var CACHE = "centinela-v5.3.0";
 var SHELL = [
   "./",
   "./index.html",
