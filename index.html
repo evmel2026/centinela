@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="5.3.0">
+<meta name="app-version" content="5.5.0">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -429,7 +429,9 @@
   .field{margin-bottom:14px}
   .field label{display:block;font-size:12px;color:var(--ink-dim);margin-bottom:6px;letter-spacing:.04em}
   .field input[type=text],.field input[type=number],.field input[type=password]{width:100%;background:var(--metric-bg);border:1px solid var(--line);color:var(--ink);padding:10px 12px;border-radius:10px;font-family:var(--mono);font-size:13px;transition:border-color .2s,box-shadow .2s}
-  .field input:focus{outline:none;border-color:var(--neon);box-shadow:0 0 0 3px rgba(45,226,234,.12)}
+  .field select{width:100%;background:var(--metric-bg);border:1px solid var(--line);color:var(--ink);padding:10px 12px;border-radius:10px;font-family:var(--mono);font-size:12px;appearance:none;-webkit-appearance:none}
+  .field select option{background:#0d1626;color:#e9f2ff}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--neon);box-shadow:0 0 0 3px rgba(45,226,234,.12)}
   .hint{font-size:11px;color:var(--ink-faint);margin-top:5px;line-height:1.4}
   .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;user-select:none}
   .chk input{accent-color:var(--neon);width:16px;height:16px}
@@ -858,7 +860,7 @@ var DEFAULT_APPS = [
       {table:"auditoria",    idCol:"id", tsCol:"", dataCol:"", required:""}
     ],
     actTable:"auditoria" },
-  { key:"lda", name:"Legajo Digital del Aspirante",
+  { key:"lda", name:"Legajo Digital del Aspirante", modo:"implementacion",
     url:"https://ybutbzvauftqfzerwwvi.supabase.co",
     apikey:"sb_publishable_fyo7XAqfmg8RXhns-kcCLQ_qbTRHuUX",
     auth:{ email:"", password:"" },
@@ -889,6 +891,12 @@ var DEFAULT_APPS = [
     ] }
 ];
 
+/* Nombre "oficial" de cada app segun esta version del codigo */
+function defName(key){
+  for(var i=0;i<DEFAULT_APPS.length;i++){ if(DEFAULT_APPS[i].key===key) return DEFAULT_APPS[i].name; }
+  return "";
+}
+
 /* ===== Estado de configuración de cada app ===== */
 function appConfigured(app){
   return !!(app && app.url && app.apikey && app.tables && app.tables.length);
@@ -912,6 +920,9 @@ function mergeApps(saved){
       if(!a.url && d.url) a.url=d.url;
       if(!a.apikey && d.apikey) a.apikey=d.apikey;
       if(a.actTable===undefined && d.actTable) a.actTable=d.actTable;
+      /* Si la app cambia de nombre en el codigo, se actualiza aca —
+         salvo que vos le hayas puesto un nombre propio desde Configurar */
+      if(!a.nameCustom && d.name && a.name!==d.name){ a.name=d.name; a.short=""; }
     }
   });
   out.forEach(function(a){
@@ -919,6 +930,10 @@ function mergeApps(saved){
     if(a.actTable===undefined) a.actTable="";
     if(!a.actTable){ for(var q=0;q<DEFAULT_APPS.length;q++){ if(DEFAULT_APPS[q].key===a.key && DEFAULT_APPS[q].actTable) a.actTable=DEFAULT_APPS[q].actTable; } }
     if(a.actUserCol===undefined) a.actUserCol="";
+    /* activa | implementacion — si nunca se definió, toma el valor de fábrica */
+    if(!a.modo){ a.modo="activa"; for(var m=0;m<DEFAULT_APPS.length;m++){ if(DEFAULT_APPS[m].key===a.key && DEFAULT_APPS[m].modo) a.modo=DEFAULT_APPS[m].modo; } }
+    if(a.nameCustom===undefined) a.nameCustom=false;
+    if(a.short===undefined) a.short="";
     if(!a.tables) a.tables=[];
   });
   return out;
@@ -1303,11 +1318,16 @@ function analyzeTable(t, rows, total){
 }
 
 /* frescura → nivel según umbrales */
-function freshOf(newest, hasTs){
+function enMarchaBlanca(app){ return !!(app && app.modo==="implementacion"); }
+function freshOf(newest, hasTs, app){
+  var blanca=enMarchaBlanca(app);
   if(!hasTs) return { freshness:"n/d", freshLevel:"ok" };
-  if(newest===null) return { freshness:"sin fecha", freshLevel:"warn" };
+  if(newest===null) return { freshness:blanca?"sin uso aún":"sin fecha", freshLevel:blanca?"ok":"warn" };
   var age=Date.now()-newest, lvl="ok";
   if(age>=cfg.freshCrit*3600000) lvl="err"; else if(age>=cfg.freshWarn*3600000) lvl="warn";
+  /* App en implementación: que todavía no la usen NO es una falla.
+     Se sigue mostrando hace cuánto fue el último movimiento, pero no pinta rojo. */
+  if(blanca) lvl="ok";
   return { freshness:fmtAgo(age), freshLevel:lvl };
 }
 
@@ -1316,7 +1336,7 @@ function scanTableDeep(app, t){
   var t0=performance.now();
   return supaGetFull(app, t.table).then(function(res){
     var a=analyzeTable(t, res.rows, res.total);
-    var fr=freshOf(a.newest, !!a.cols.ts);
+    var fr=freshOf(a.newest, !!a.cols.ts, app);
     if(!deepCache[app.key]) deepCache[app.key]={};
     deepCache[app.key][t.table]={ t:Date.now(), errs:a.errs, warns:a.warns, dupes:a.dupes, issues:a.issues, cols:a.cols, newest:a.newest, tsText:a.tsText };
     var status="ok";
@@ -1349,7 +1369,7 @@ function scanTableLight(app, t){
   return Promise.all([ supaCount(app, t.table), newestP ]).then(function(vals){
     var total=vals[0], newest=vals[1];
     if(newest!=null && isNaN(newest)) newest=null;
-    var fr=freshOf(newest, !!tsCol);
+    var fr=freshOf(newest, !!tsCol, app);
     var errs=cache?cache.errs:0, warns=cache?cache.warns:0, dupes=cache?cache.dupes:0, issues=cache?cache.issues:[];
     var status="ok";
     if(errs>0||fr.freshLevel==="err") status="err"; else if(warns>0||fr.freshLevel==="warn") status="warn";
@@ -1549,7 +1569,9 @@ function renderCard(R){
   var card=$("card-"+R.app.key); if(!card) return;
   if(R.unconfigured){ card.className="card s-idle-cfg"; card.innerHTML=cardIdleHTML(R.app); return; }
   card.className="card s-"+R.status;
-  var chip = R.offline===R.tableCount ? "OFFLINE" : (R.status==="ok"?"OPERATIVA":R.status==="warn"?"ATENCIÓN":"PROBLEMA");
+  var chip = R.offline===R.tableCount ? "OFFLINE"
+           : R.status==="ok" ? (enMarchaBlanca(R.app)?"MARCHA BLANCA":"OPERATIVA")
+           : R.status==="warn" ? "ATENCIÓN" : "PROBLEMA";
   var tblsHtml = R.tables.map(function(t){
     var col = t.status==="ok"?"var(--ok)":t.status==="warn"?"var(--warn)":"var(--err)";
     var meta = t.online ? (t.total+" reg · "+t.freshness+" · "+t.lat+" ms"+(t.dupes?(" · "+t.dupes+" dup"):"")) : "sin conexión";
@@ -1649,7 +1671,7 @@ function setNet(s){
 function exportReport(){
   if(!lastResults){ toast("Escaneá al menos una vez antes de exportar"); return; }
   var rep={
-    sistema:"CENTINELA v5.3.0 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
+    sistema:"CENTINELA v5.5.0 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
     generado:new Date().toLocaleString("es-AR"),
     apps:lastResults.map(function(R){
       return { app:R.app.name, host:host(R.app.url), estado:R.status, modo:R.mode,
@@ -2622,7 +2644,16 @@ function openCfg(){
         '</div></div>';
     }).join("");
     var au=app.auth||{email:"",password:""};
+    var esBlanca=enMarchaBlanca(app);
     return '<div class="app-cfg"><h4>'+esc(app.name)+(appConfigured(app)?"":' <span style="color:var(--warn);font-size:11px;letter-spacing:normal">\u00b7 en espera</span>')+'</h4>'+
+      '<div class="row4" style="grid-template-columns:2fr 1.4fr">'+
+        '<div class="field"><label>Nombre que se muestra</label><input type="text" data-a="'+ai+'" data-app="name" value="'+esc(app.name)+'" placeholder="'+esc(defName(app.key)||"Nombre de la app")+'"></div>'+
+        '<div class="field"><label>Situaci\u00f3n</label><select data-a="'+ai+'" data-app="modo">'+
+          '<option value="activa"'+(esBlanca?"":" selected")+'>En uso (alerta si se queda sin movimiento)</option>'+
+          '<option value="implementacion"'+(esBlanca?" selected":"")+'>En implementaci\u00f3n (todav\u00eda no la usan)</option>'+
+        '</select></div>'+
+      '</div>'+
+      '<div class="hint">Si la dej\u00e1s <b>en implementaci\u00f3n</b>, CENTINELA la sigue vigilando y avisa si se cae la conexi\u00f3n, pero no la pinta de rojo solo porque nadie carg\u00f3 datos todav\u00eda. Si borr\u00e1s el nombre, vuelve al de f\u00e1brica.</div>'+
       '<div class="field"><label>URL Supabase</label><input type="text" data-a="'+ai+'" data-app="url" value="'+esc(app.url)+'" placeholder="https://xxxx.supabase.co"></div>'+
       '<div class="field"><label>Clave p\u00fablica</label><input type="'+(showK?"text":"password")+'" class="keyinput" data-a="'+ai+'" data-app="apikey" value="'+esc(app.apikey)+'" placeholder="sb_publishable_..."></div>'+
       '<div class="row4">'+
@@ -2673,7 +2704,21 @@ function readCfgForm(){
   cfg.deepEvery=Math.max(1,parseInt($("deepEvery").value,10)||15);
   cfg.sampleLimit=Math.max(50,parseInt($("sampleLimit").value,10)||2000);
   cfg.sound=$("soundChk").checked;
-  $("appCfgList").querySelectorAll("input[data-app]").forEach(function(inp){ cfg.apps[+inp.getAttribute("data-a")][inp.getAttribute("data-app")]=inp.value.trim(); });
+  $("appCfgList").querySelectorAll("input[data-app]").forEach(function(inp){
+    var a=cfg.apps[+inp.getAttribute("data-a")]; if(!a) return;
+    var f=inp.getAttribute("data-app"), v=inp.value.trim();
+    if(f==="name"){
+      var oficial=defName(a.key);
+      if(!v){ a.name=oficial||a.name; a.nameCustom=false; a.short=""; }
+      else { a.name=v; a.nameCustom=(v!==oficial); if(a.nameCustom) a.short=""; }
+      return;
+    }
+    a[f]=v;
+  });
+  $("appCfgList").querySelectorAll("select[data-app]").forEach(function(sel){
+    var a=cfg.apps[+sel.getAttribute("data-a")]; if(!a) return;
+    a[sel.getAttribute("data-app")]=sel.value;
+  });
   $("appCfgList").querySelectorAll("input[data-auth]").forEach(function(inp){
     var a=cfg.apps[+inp.getAttribute("data-a")]; if(!a) return;
     if(!a.auth) a.auth={email:"",password:""};
@@ -2840,7 +2885,7 @@ $("themeBtn").addEventListener("click", function(){
 
 
 /* ===================================================================
-   CENTINELA v5 · Centro de mando
+   CENTINELA v5.5 · Centro de mando
    Mosaico de estado, una vista por aplicación y paneles genéricos
    para las apps que todavía no tienen tablero propio.
    =================================================================== */
@@ -2857,7 +2902,7 @@ function hasOwnPanel(app){ return app.key==="suep" || app.key==="rodar"; }
 var SHORT_NAMES={ rodar:"RODAR", suep:"SUEP", rend:"Rendimiento", sabe:"Becas", lda:"Legajo Digital", nexfor:"NEXFOR" };
 function tabName(app){
   if(app.short) return app.short;
-  if(SHORT_NAMES[app.key]) return SHORT_NAMES[app.key];
+  if(!app.nameCustom && SHORT_NAMES[app.key] && app.name===defName(app.key)) return SHORT_NAMES[app.key];
   var n=String(app.name||"").replace(/\s*\(.*?\)\s*/g," ").trim();
   return n.length>20 ? n.slice(0,19)+"\u2026" : n;
 }
@@ -2936,6 +2981,20 @@ function showView(v, silent){
   }
 }
 
+/* Por qué una app no está en verde (se muestra en su baldosa) */
+function motivoEstado(R){
+  if(!R || R.unconfigured || R.status==="ok") return "";
+  if(R.tableCount && R.offline===R.tableCount) return "Sin conexi\u00f3n";
+  if(R.offline>0) return R.offline+" tabla(s) sin conexi\u00f3n";
+  var viejas=0;
+  (R.tables||[]).forEach(function(t){ if(t.online && t.freshLevel==="err") viejas++; });
+  if(viejas) return "Sin movimiento hace rato";
+  if(R.totalDupes) return R.totalDupes+" ID duplicado(s)";
+  if(R.totalErr) return R.totalErr+" error(es) de datos";
+  if(R.totalWarn) return R.totalWarn+" aviso(s)";
+  return "";
+}
+
 /* ===== Mosaico de estado ===== */
 function renderMosaic(results){
   var box=$("mosaic"); if(!box) return;
@@ -2945,12 +3004,13 @@ function renderMosaic(results){
     var st = (!R || R.unconfigured) ? "idle" : R.status;
     var lbl = !R ? "En espera"
             : R.unconfigured ? "Sin configurar"
-            : R.status==="ok" ? "Operativa"
-            : R.status==="warn" ? "Atenci\u00f3n" : "Problema";
+            : R.status==="ok" ? (enMarchaBlanca(app)?"En marcha blanca":"Operativa")
+            : (motivoEstado(R) || (R.status==="warn" ? "Atenci\u00f3n" : "Problema"));
     var val = (R && !R.unconfigured)
       ? (R.totalRec+" reg \u00b7 "+R.lat+" ms")
       : (appConfigured(app) ? "sin datos" : "falta conexi\u00f3n");
-    return '<button type="button" class="mtile s-'+st+(curView===app.key?" on":"")+'" data-view="'+esc(app.key)+'" style="--i:'+i+'" title="'+esc(app.name)+'">'+
+    var tip = app.name + (enMarchaBlanca(app) ? " \u00b7 en implementaci\u00f3n (no alerta por falta de uso)" : "");
+    return '<button type="button" class="mtile s-'+st+(curView===app.key?" on":"")+'" data-view="'+esc(app.key)+'" style="--i:'+i+'" title="'+esc(tip)+'">'+
       '<span class="mled"></span>'+
       '<div class="mn">'+esc(tabName(app))+'</div>'+
       '<div class="ms">'+lbl+'</div>'+
