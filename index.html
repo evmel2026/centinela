@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="5.5.0">
+<meta name="app-version" content="5.5.1">
 <title>CENTINELA · Centro de Monitoreo</title>
 <meta name="theme-color" content="#04070f">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -873,7 +873,7 @@ var DEFAULT_APPS = [
       {table:"lda_avisos",    idCol:"id", tsCol:"", dataCol:"", required:""},
       {table:"lda_config",    idCol:"id", tsCol:"", dataCol:"", required:""}
     ] },
-  { key:"nexfor", name:"NEXFOR",
+  { key:"nexfor", name:"FOR.A.AS",
     url:"https://kduwezgatmloujsmfzji.supabase.co",
     apikey:"sb_publishable_SU2oC08EGUgC_FUFl8TKlA_Rj0YKP_v",
     auth:{ email:"", password:"" },
@@ -1671,7 +1671,7 @@ function setNet(s){
 function exportReport(){
   if(!lastResults){ toast("Escaneá al menos una vez antes de exportar"); return; }
   var rep={
-    sistema:"CENTINELA v5.5.0 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
+    sistema:"CENTINELA v5.5.1 \u00b7 Secretar\u00eda Acad\u00e9mica DCFyCCCO",
     generado:new Date().toLocaleString("es-AR"),
     apps:lastResults.map(function(R){
       return { app:R.app.name, host:host(R.app.url), estado:R.status, modo:R.mode,
@@ -2899,7 +2899,7 @@ var layoutReady = false;
 function appByKey(k){ for(var i=0;i<cfg.apps.length;i++){ if(cfg.apps[i].key===k) return cfg.apps[i]; } return null; }
 function lastResultFor(k){ if(!lastResults) return null; for(var i=0;i<lastResults.length;i++){ if(lastResults[i].app.key===k) return lastResults[i]; } return null; }
 function hasOwnPanel(app){ return app.key==="suep" || app.key==="rodar"; }
-var SHORT_NAMES={ rodar:"RODAR", suep:"SUEP", rend:"Rendimiento", sabe:"Becas", lda:"Legajo Digital", nexfor:"NEXFOR" };
+var SHORT_NAMES={ rodar:"RODAR", suep:"SUEP", rend:"Rendimiento", sabe:"Becas", lda:"Legajo Digital", nexfor:"FOR.A.AS" };
 function tabName(app){
   if(app.short) return app.short;
   if(!app.nameCustom && SHORT_NAMES[app.key] && app.name===defName(app.key)) return SHORT_NAMES[app.key];
